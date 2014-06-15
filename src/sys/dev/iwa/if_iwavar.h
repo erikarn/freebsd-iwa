@@ -24,7 +24,6 @@ struct iwa_vap {
 struct iwa_softc {
 	device_t		sc_dev;
 
-	struct ifnet		*sc_ifp;
 	int			sc_debug;
 
 	struct mtx		sc_mtx;
@@ -34,6 +33,18 @@ struct iwa_softc {
 	uint16_t		subdevice_id;
 
 	const char		*fwname;
+
+	/* Driver bus resources */
+	struct resource		*mem;
+	bus_space_tag_t		sc_st;
+	bus_space_handle_t	sc_sh;
+	struct resource		*irq;
+	void			*sc_ih;
+	bus_size_t		sc_sz;
+	int			sc_cap_off;
+
+	/* ifnet layer resources */
+	struct ifnet		*sc_ifp;
 
 	/* Taskqueue */
 	struct taskqueue	*sc_tq;

@@ -68,6 +68,7 @@ __FBSDID("$FreeBSD$");
 #include <net80211/ieee80211_regdomain.h>
 #include <net80211/ieee80211_ratectl.h>
 
+#include <dev/iwa/if_iwa_debug.h>
 #include <dev/iwa/if_iwavar.h>
 
 struct iwa_ident {
@@ -77,11 +78,13 @@ struct iwa_ident {
 };
 
 static const struct iwa_ident iwa_ident_table[] = {
-#if 0
-	{ 0x8086, 0x4060, "Intel Advanced 7260" },
-#endif
+	/* XXX Adrian's testing NIC */
+	{ 0x8086, 0x08b1, "Intel Advanced 7260" },
 	{ 0, 0, NULL }
 };
+
+static int iwa_detach(device_t dev);
+
 static int
 iwa_probe(device_t dev)
 {
@@ -100,16 +103,17 @@ iwa_probe(device_t dev)
 static int
 iwa_attach(device_t dev)
 {
+	struct iwa_softc *sc = (struct iwa_softc *)device_get_softc(dev);
 #if 0
-	struct iwn_softc *sc = (struct iwn_softc *)device_get_softc(dev);
 	struct ieee80211com *ic;
 	struct ifnet *ifp;
-	int i, error, rid;
 	uint8_t macaddr[IEEE80211_ADDR_LEN];
+#endif
+	int i, error, rid;
 
 	sc->sc_dev = dev;
 
-#ifdef	IWN_DEBUG
+#ifdef	IWA_DEBUG
 	error = resource_int_value(device_get_name(sc->sc_dev),
 	    device_get_unit(sc->sc_dev), "debug", &(sc->sc_debug));
 	if (error != 0)
@@ -118,7 +122,7 @@ iwa_attach(device_t dev)
 	sc->sc_debug = 0;
 #endif
 
-	DPRINTF(sc, IWN_DEBUG_TRACE, "->%s: begin\n",__func__);
+	IWA_DPRINTF(sc, IWA_DEBUG_TRACE, "->%s: begin\n",__func__);
 
 	/*
 	 * Get the offset of the PCI Express Capability Structure in PCI
@@ -160,8 +164,9 @@ iwa_attach(device_t dev)
 		goto fail;
 	}
 
-	IWN_LOCK_INIT(sc);
+	IWA_LOCK_INIT(sc);
 
+#if 0
 	/* Read hardware revision and attach. */
 	sc->hw_type = (IWN_READ(sc, IWN_HW_REV) >> IWN_HW_REV_TYPE_SHIFT)
 	    & IWN_HW_REV_TYPE_MASK;
@@ -407,23 +412,22 @@ iwa_attach(device_t dev)
 
 	if (bootverbose)
 		ieee80211_announce(ic);
-	DPRINTF(sc, IWN_DEBUG_TRACE, "->%s: end\n",__func__);
+#endif
+
+	IWA_DPRINTF(sc, IWA_DEBUG_TRACE, "->%s: end\n",__func__);
 	return 0;
 fail:
-	iwn_detach(dev);
-	DPRINTF(sc, IWN_DEBUG_TRACE, "->%s: end in error\n",__func__);
-	return error;
-#endif
-	return (ENXIO);
-
+	iwa_detach(dev);
+	IWA_DPRINTF(sc, IWA_DEBUG_TRACE, "->%s: end in error\n",__func__);
+	return (error);
 }
 
 static int
 iwa_detach(device_t dev)
 {
-#if 0
-	struct iwn_softc *sc = device_get_softc(dev);
+	struct iwa_softc *sc = device_get_softc(dev);
 	struct ifnet *ifp = sc->sc_ifp;
+#if 0
 	struct ieee80211com *ic;
 	int qid;
 
@@ -445,6 +449,7 @@ iwa_detach(device_t dev)
 		callout_drain(&sc->calib_to);
 		ieee80211_ifdetach(ic);
 	}
+#endif
 
 	/* Uninstall interrupt handler. */
 	if (sc->irq != NULL) {
@@ -453,7 +458,7 @@ iwa_detach(device_t dev)
 		    sc->irq);
 		pci_release_msi(dev);
 	}
-
+#if 0
 	/* Free DMA resources. */
 	iwn_free_rx_ring(sc, &sc->rxq);
 	for (qid = 0; qid < sc->ntxqs; qid++)
@@ -463,6 +468,7 @@ iwa_detach(device_t dev)
 	if (sc->ict != NULL)
 		iwn_free_ict(sc);
 	iwn_free_fwmem(sc);
+#endif
 
 	if (sc->mem != NULL)
 		bus_release_resource(dev, SYS_RES_MEMORY,
@@ -471,17 +477,17 @@ iwa_detach(device_t dev)
 	if (ifp != NULL)
 		if_free(ifp);
 
-	DPRINTF(sc, IWN_DEBUG_TRACE, "->%s: end\n", __func__);
-	IWN_LOCK_DESTROY(sc);
-#endif
-	return 0;
+	IWA_DPRINTF(sc, IWA_DEBUG_TRACE, "->%s: end\n", __func__);
+	IWA_LOCK_DESTROY(sc);
+
+	return (0);
 }
 
 static int
 iwa_shutdown(device_t dev)
 {
 #if 0
-	struct iwn_softc *sc = device_get_softc(dev);
+	struct iwa_softc *sc = device_get_softc(dev);
 
 	iwn_stop(sc);
 #endif
@@ -492,7 +498,7 @@ static int
 iwa_suspend(device_t dev)
 {
 #if 0
-	struct iwn_softc *sc = device_get_softc(dev);
+	struct iwa_softc *sc = device_get_softc(dev);
 	struct ieee80211com *ic = sc->sc_ifp->if_l2com;
 
 	ieee80211_suspend_all(ic);
@@ -504,7 +510,7 @@ static int
 iwa_resume(device_t dev)
 {
 #if 0
-	struct iwn_softc *sc = device_get_softc(dev);
+	struct iwa_softc *sc = device_get_softc(dev);
 	struct ieee80211com *ic = sc->sc_ifp->if_l2com;
 
 	/* Clear device-specific "PCI retry timeout" register (41h). */
