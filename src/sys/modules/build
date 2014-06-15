@@ -1,0 +1,8 @@
+#!/bin/sh
+
+X_KERNDIR="/home/adrian/work/freebsd/head/obj/usr/home/adrian/work/freebsd/head/src/sys/LUCY_11_i386/" ; export X_KERNDIR
+X_SRCDIR="/home/adrian/work/freebsd/head/src/" ; export X_SRCDIR
+MODULES_LIST="iwa iwafw" ; export MODULES_LIST
+X_CFLAGS2="-I/home/adrian/git/github/erikarn/freebsd-iwa/src/sys/" ; export X_CFLAGS2
+
+/home/adrian/git/github/erikarn/freebsd-wifi-build/scripts/build_modules/build_modules $*
