@@ -80,6 +80,7 @@ struct iwa_ident {
 static const struct iwa_ident iwa_ident_table[] = {
 	/* XXX Adrian's testing NIC */
 	{ 0x8086, 0x08b1, "Intel Advanced 7260" },
+	{ 0x8086, 0x08b2, "Intel Advanced 7260 Wireless-N" },
 	{ 0, 0, NULL }
 };
 
