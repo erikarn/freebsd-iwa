@@ -32,7 +32,8 @@ struct iwa_softc {
 	/* subdevice_id used to adjust configuration */
 	uint16_t		subdevice_id;
 
-	const char		*fwname;
+	const char		*sc_fw_name;
+	bus_size_t		sc_fw_dmasegsz;
 
 	/* Driver bus resources */
 	struct resource		*mem;
@@ -49,6 +50,8 @@ struct iwa_softc {
 	/* Taskqueue */
 	struct taskqueue	*sc_tq;
 
+	/* Firmware */
+	struct iwa_fw_info	sc_fw;
 };
 
 #define IWA_LOCK_INIT(_sc) \

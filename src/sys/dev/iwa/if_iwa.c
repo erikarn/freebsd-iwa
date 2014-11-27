@@ -69,7 +69,9 @@ __FBSDID("$FreeBSD$");
 #include <net80211/ieee80211_ratectl.h>
 
 #include <dev/iwa/if_iwa_debug.h>
+#include <dev/iwa/if_iwa_firmware.h>
 #include <dev/iwa/if_iwavar.h>
+
 
 struct iwa_ident {
 	uint16_t	vendor;
@@ -141,6 +143,15 @@ iwa_attach(device_t dev)
 	/* Enable bus-mastering. */
 	pci_enable_busmaster(dev);
 
+	/* XXX from OpenBSD port: disable interrupts when enabling busmaster? */
+#if 0
+        reg |= PCI_COMMAND_MASTER_ENABLE;
+        /* if !MSI */
+        if (reg & PCI_COMMAND_INTERRUPT_DISABLE) {
+                reg &= ~PCI_COMMAND_INTERRUPT_DISABLE;
+        }
+#endif
+
 	rid = PCIR_BAR(0);
 	sc->mem = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid,
 	    RF_ACTIVE);
@@ -156,6 +167,7 @@ iwa_attach(device_t dev)
 	rid = 0;
 	if (pci_alloc_msi(dev, &i) == 0)
 		rid = 1;
+
 	/* Install interrupt handler. */
 	sc->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid, RF_ACTIVE |
 	    (rid != 0 ? 0 : RF_SHAREABLE));
@@ -166,6 +178,11 @@ iwa_attach(device_t dev)
 	}
 
 	IWA_LOCK_INIT(sc);
+
+	/* Setup initial firmware details */
+	/* only one firmware possibility for now */
+	sc->sc_fw_name = IWM_FWNAME;
+	sc->sc_fw_dmasegsz = IWM_FWDMASEGSZ;
 
 #if 0
 	/* Read hardware revision and attach. */
