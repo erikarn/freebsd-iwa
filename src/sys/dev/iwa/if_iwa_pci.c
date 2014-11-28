@@ -68,22 +68,41 @@ __FBSDID("$FreeBSD$");
 #include <net80211/ieee80211_regdomain.h>
 #include <net80211/ieee80211_ratectl.h>
 
+#include <dev/iwa/drv-compat.h>
 #include <dev/iwa/if_iwa_debug.h>
 #include <dev/iwa/if_iwa_firmware.h>
 #include <dev/iwa/if_iwavar.h>
+#include <dev/iwa/iwl/iwl-config.h>
 
 
 struct iwa_ident {
 	uint16_t	vendor;
 	uint16_t	device;
-	const char	*name;
+	uint16_t	sub_vendor;
+	uint16_t	sub_device;
+	const void	*cfg;
 };
 
+#define	IWL_PCI_DEVICE(d, sd, p) \
+	.vendor = 0x8086, .device = (d), .sub_vendor = 0x8086, .sub_device = (sd), .cfg = &(p)
+
 static const struct iwa_ident iwa_ident_table[] = {
-	/* XXX Adrian's testing NIC */
-	{ 0x8086, 0x08b1, "Intel Advanced 7260" },
-	{ 0x8086, 0x08b2, "Intel Advanced 7260 Wireless-N" },
-	{ 0, 0, NULL }
+	{IWL_PCI_DEVICE(0x08B1, 0x4070, iwl7260_2ac_cfg)},
+	{IWL_PCI_DEVICE(0x08B1, 0x4072, iwl7260_2ac_cfg)},
+	{IWL_PCI_DEVICE(0x08B1, 0x4170, iwl7260_2ac_cfg)},
+	{IWL_PCI_DEVICE(0x08B1, 0x4060, iwl7260_2n_cfg)},
+	{IWL_PCI_DEVICE(0x08B1, 0x406A, iwl7260_2n_cfg)},
+	{IWL_PCI_DEVICE(0x08B1, 0x4160, iwl7260_2n_cfg)},
+	{IWL_PCI_DEVICE(0x08B1, 0x4062, iwl7260_n_cfg)},
+	{IWL_PCI_DEVICE(0x08B1, 0x4162, iwl7260_n_cfg)},
+
+	{IWL_PCI_DEVICE(0x08B2, 0x4270, iwl7260_2ac_cfg)},
+	{IWL_PCI_DEVICE(0x08B2, 0x4272, iwl7260_2ac_cfg)},
+	{IWL_PCI_DEVICE(0x08B2, 0x4260, iwl7260_2n_cfg)},
+	{IWL_PCI_DEVICE(0x08B2, 0x426A, iwl7260_2n_cfg)},
+	{IWL_PCI_DEVICE(0x08B2, 0x4262, iwl7260_n_cfg)},
+
+	{ 0, 0, 0, 0, NULL }
 };
 
 static int iwa_pci_detach(device_t dev);
@@ -99,12 +118,18 @@ iwa_pci_intr(void *arg)
 static int
 iwa_pci_probe(device_t dev)
 {
+	struct iwa_softc *sc = (struct iwa_softc *)device_get_softc(dev);
+
 	const struct iwa_ident *ident;
 
-	for (ident = iwa_ident_table; ident->name != NULL; ident++) {
+	for (ident = iwa_ident_table; ident->cfg != NULL; ident++) {
 		if (pci_get_vendor(dev) == ident->vendor &&
-		    pci_get_device(dev) == ident->device) {
-			device_set_desc(dev, ident->name);
+		    pci_get_device(dev) == ident->device &&
+		    pci_get_subvendor(dev) == ident->sub_vendor &&
+		    pci_get_subdevice(dev) == ident->sub_device) {
+			/* Assign the hardware type early during probe */
+			sc->sc_cfg = ident->cfg;
+			device_set_desc(dev, sc->sc_cfg->name);
 			return (BUS_PROBE_DEFAULT);
 		}
 	}

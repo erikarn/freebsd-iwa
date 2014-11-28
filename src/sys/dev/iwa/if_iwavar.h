@@ -55,6 +55,9 @@ struct iwa_softc {
 
 	/* Firmware */
 	struct iwa_fw_info	sc_fw;
+
+	/* Configuration */
+	const struct iwl_cfg	*sc_cfg;
 };
 
 #define IWA_LOCK_INIT(_sc) \

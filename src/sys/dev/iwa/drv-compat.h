@@ -18,7 +18,7 @@ typedef uint8_t u8;
 
 
 /*
- * XXX this is from linux mac80211.h - whatever uses this needs
+ * XXX XXXGPL this is from linux mac80211.h - whatever uses this needs
  * to be eventually turned into the freebsd SMPS stuff - and
  * freebsd's SMPS stuff needs to be an actual enum.
  */
@@ -41,5 +41,19 @@ enum ieee80211_smps_mode {
         IEEE80211_SMPS_NUM_MODES,
 };
 
+/*
+ * XXX XXXGPL from Linux include/linux/stringify.h
+ */
+
+/* Indirect stringification.  Doing two levels allows the parameter to be a
+ * macro itself.  For example, compile with -DFOO=bar, __stringify(FOO)
+ * converts to "bar".
+ */
+
+#define __stringify_1(x...)     #x
+#define __stringify(x...)       __stringify_1(x)
+
+#define	IEEE80211_BAND_2GHZ	0
+#define	IEEE80211_BAND_5GHZ	1
 
 #endif	/* __IWA_DRV_COMPAT_H__ */
