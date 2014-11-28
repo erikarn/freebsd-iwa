@@ -1,6 +1,8 @@
+#ifndef	__IF_IWAVAR_H__
+#define	__IF_IWAVAR_H__
 
 /*-
- * Copyright (c) 2014 Adrian Chadd<adrian@FreeBSD.org>
+ * Copyright (c) 2014 Adrian Chadd <adrian@FreeBSD.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -41,7 +43,8 @@ struct iwa_softc {
 	bus_space_handle_t	sc_sh;
 	struct resource		*irq;
 	void			*sc_ih;
-	bus_size_t		sc_sz;
+//	bus_size_t		sc_sz;
+	bus_dma_tag_t		sc_dmat;
 	int			sc_cap_off;
 
 	/* ifnet layer resources */
@@ -61,3 +64,11 @@ struct iwa_softc {
 #define IWA_LOCK_ASSERT(_sc)		mtx_assert(&(_sc)->sc_mtx, MA_OWNED)
 #define IWA_UNLOCK(_sc)			mtx_unlock(&(_sc)->sc_mtx)
 #define IWA_LOCK_DESTROY(_sc)		mtx_destroy(&(_sc)->sc_mtx)
+
+extern	int iwa_attach(struct iwa_softc *sc);
+extern	int iwa_detach(struct iwa_softc *sc);
+extern	int iwa_shutdown(struct iwa_softc *sc);
+extern	int iwa_suspend(struct iwa_softc *sc);
+extern	int iwa_resume(struct iwa_softc *sc);
+
+#endif	/* __IF_IWAVAR_H__ */

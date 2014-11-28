@@ -73,48 +73,15 @@ __FBSDID("$FreeBSD$");
 #include <dev/iwa/if_iwavar.h>
 
 
-struct iwa_ident {
-	uint16_t	vendor;
-	uint16_t	device;
-	const char	*name;
-};
-
-static const struct iwa_ident iwa_ident_table[] = {
-	/* XXX Adrian's testing NIC */
-	{ 0x8086, 0x08b1, "Intel Advanced 7260" },
-	{ 0x8086, 0x08b2, "Intel Advanced 7260 Wireless-N" },
-	{ 0, 0, NULL }
-};
-
-static int iwa_detach(device_t dev);
-
-static int
-iwa_probe(device_t dev)
+int
+iwa_attach(struct iwa_softc *sc)
 {
-	const struct iwa_ident *ident;
-
-	for (ident = iwa_ident_table; ident->name != NULL; ident++) {
-		if (pci_get_vendor(dev) == ident->vendor &&
-		    pci_get_device(dev) == ident->device) {
-			device_set_desc(dev, ident->name);
-			return (BUS_PROBE_DEFAULT);
-		}
-	}
-	return (ENXIO);
-}
-
-static int
-iwa_attach(device_t dev)
-{
-	struct iwa_softc *sc = (struct iwa_softc *)device_get_softc(dev);
 #if 0
 	struct ieee80211com *ic;
 	struct ifnet *ifp;
 	uint8_t macaddr[IEEE80211_ADDR_LEN];
 #endif
-	int i, error, rid;
-
-	sc->sc_dev = dev;
+	int error;
 
 #ifdef	IWA_DEBUG
 	error = resource_int_value(device_get_name(sc->sc_dev),
@@ -126,58 +93,6 @@ iwa_attach(device_t dev)
 #endif
 
 	IWA_DPRINTF(sc, IWA_DEBUG_TRACE, "->%s: begin\n",__func__);
-
-	/*
-	 * Get the offset of the PCI Express Capability Structure in PCI
-	 * Configuration Space.
-	 */
-	error = pci_find_cap(dev, PCIY_EXPRESS, &sc->sc_cap_off);
-	if (error != 0) {
-		device_printf(dev, "PCIe capability structure not found!\n");
-		return error;
-	}
-
-	/* Clear device-specific "PCI retry timeout" register (41h). */
-	pci_write_config(dev, 0x41, 0, 1);
-
-	/* Enable bus-mastering. */
-	pci_enable_busmaster(dev);
-
-	/* XXX from OpenBSD port: disable interrupts when enabling busmaster? */
-#if 0
-        reg |= PCI_COMMAND_MASTER_ENABLE;
-        /* if !MSI */
-        if (reg & PCI_COMMAND_INTERRUPT_DISABLE) {
-                reg &= ~PCI_COMMAND_INTERRUPT_DISABLE;
-        }
-#endif
-
-	rid = PCIR_BAR(0);
-	sc->mem = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid,
-	    RF_ACTIVE);
-	if (sc->mem == NULL) {
-		device_printf(dev, "can't map mem space\n");
-		error = ENOMEM;
-		return error;
-	}
-	sc->sc_st = rman_get_bustag(sc->mem);
-	sc->sc_sh = rman_get_bushandle(sc->mem);
-
-	i = 1;
-	rid = 0;
-	if (pci_alloc_msi(dev, &i) == 0)
-		rid = 1;
-
-	/* Install interrupt handler. */
-	sc->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid, RF_ACTIVE |
-	    (rid != 0 ? 0 : RF_SHAREABLE));
-	if (sc->irq == NULL) {
-		device_printf(dev, "can't map interrupt\n");
-		error = ENOMEM;
-		goto fail;
-	}
-
-	IWA_LOCK_INIT(sc);
 
 	/* Setup initial firmware details */
 	/* only one firmware possibility for now */
@@ -434,16 +349,18 @@ iwa_attach(device_t dev)
 
 	IWA_DPRINTF(sc, IWA_DEBUG_TRACE, "->%s: end\n",__func__);
 	return 0;
+
+#if 0
 fail:
-	iwa_detach(dev);
+	iwa_detach(sc);
 	IWA_DPRINTF(sc, IWA_DEBUG_TRACE, "->%s: end in error\n",__func__);
 	return (error);
+#endif
 }
 
-static int
-iwa_detach(device_t dev)
+int
+iwa_detach(struct iwa_softc *sc)
 {
-	struct iwa_softc *sc = device_get_softc(dev);
 	struct ifnet *ifp = sc->sc_ifp;
 #if 0
 	struct ieee80211com *ic;
@@ -469,13 +386,6 @@ iwa_detach(device_t dev)
 	}
 #endif
 
-	/* Uninstall interrupt handler. */
-	if (sc->irq != NULL) {
-		bus_teardown_intr(dev, sc->irq, sc->sc_ih);
-		bus_release_resource(dev, SYS_RES_IRQ, rman_get_rid(sc->irq),
-		    sc->irq);
-		pci_release_msi(dev);
-	}
 #if 0
 	/* Free DMA resources. */
 	iwn_free_rx_ring(sc, &sc->rxq);
@@ -488,21 +398,16 @@ iwa_detach(device_t dev)
 	iwn_free_fwmem(sc);
 #endif
 
-	if (sc->mem != NULL)
-		bus_release_resource(dev, SYS_RES_MEMORY,
-		    rman_get_rid(sc->mem), sc->mem);
-
 	if (ifp != NULL)
 		if_free(ifp);
 
 	IWA_DPRINTF(sc, IWA_DEBUG_TRACE, "->%s: end\n", __func__);
-	IWA_LOCK_DESTROY(sc);
 
 	return (0);
 }
 
-static int
-iwa_shutdown(device_t dev)
+int
+iwa_shutdown(struct iwa_softc *sc)
 {
 #if 0
 	struct iwa_softc *sc = device_get_softc(dev);
@@ -512,8 +417,8 @@ iwa_shutdown(device_t dev)
 	return 0;
 }
 
-static int
-iwa_suspend(device_t dev)
+int
+iwa_suspend(struct iwa_softc *sc)
 {
 #if 0
 	struct iwa_softc *sc = device_get_softc(dev);
@@ -524,44 +429,15 @@ iwa_suspend(device_t dev)
 	return 0;
 }
 
-static int
-iwa_resume(device_t dev)
+int
+iwa_resume(struct iwa_softc *sc)
 {
 #if 0
 	struct iwa_softc *sc = device_get_softc(dev);
 	struct ieee80211com *ic = sc->sc_ifp->if_l2com;
-
-	/* Clear device-specific "PCI retry timeout" register (41h). */
-	pci_write_config(dev, 0x41, 0, 1);
 
 	ieee80211_resume_all(ic);
 #endif
 	return 0;
 }
 
-static device_method_t iwa_methods[] = {
-	/* Device interface */
-	DEVMETHOD(device_probe,		iwa_probe),
-	DEVMETHOD(device_attach,	iwa_attach),
-	DEVMETHOD(device_detach,	iwa_detach),
-	DEVMETHOD(device_shutdown,	iwa_shutdown),
-	DEVMETHOD(device_suspend,	iwa_suspend),
-	DEVMETHOD(device_resume,	iwa_resume),
-
-	DEVMETHOD_END
-};
-
-static driver_t iwa_driver = {
-	"iwa",
-	iwa_methods,
-	sizeof(struct iwa_softc)
-};
-static devclass_t iwa_devclass;
-
-DRIVER_MODULE(iwa, pci, iwa_driver, iwa_devclass, NULL, NULL);
-
-MODULE_VERSION(iwa, 1);
-
-MODULE_DEPEND(iwa, firmware, 1, 1, 1);
-MODULE_DEPEND(iwa, pci, 1, 1, 1);
-MODULE_DEPEND(iwa, wlan, 1, 1, 1);
