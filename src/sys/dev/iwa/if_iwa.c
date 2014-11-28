@@ -83,18 +83,23 @@ __FBSDID("$FreeBSD$");
 
 /*
  * Populate the hardware ID.
- *
- * XXX TODO: The 8xxx series NICs have a slightly different
- * register layout;  this needs to be updated before those
- * NICs are supported!
  */
 static void
 iwa_populate_hw_id(struct iwa_softc *sc)
 {
-	uint32_t hw_rev;
 
-	hw_rev = IWA_REG_READ(sc, CSR_HW_REV);
-	device_printf(sc->sc_dev, "%s: hw_rev=0x%08x\n", __func__, hw_rev);
+	sc->hw_rev = IWA_REG_READ(sc, CSR_HW_REV);
+	device_printf(sc->sc_dev, "%s: hw_rev=0x%08x\n", __func__, sc->hw_rev);
+
+	/*
+	 * In the 8000 HW family the format of the 4 bytes of CSR_HW_REV have
+	 * changed, and now the revision step also includes bit 0-1 (no more
+	 * "dash" value). To keep hw_rev backwards compatible - we'll store it
+	 * in the old format.
+	 */
+	if (sc->sc_cfg->device_family == IWL_DEVICE_FAMILY_8000)
+		sc->hw_rev = (sc->hw_rev & 0xfff0) |
+		    (CSR_HW_REV_STEP(sc->hw_rev << 2) << 2);
 }
 
 int

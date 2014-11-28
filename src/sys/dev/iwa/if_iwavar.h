@@ -30,7 +30,7 @@ struct iwa_softc {
 
 	struct mtx		sc_mtx;
 
-	uint8_t 		hw_type;
+	uint32_t 		hw_rev;
 	/* subdevice_id used to adjust configuration */
 	uint16_t		subdevice_id;
 
