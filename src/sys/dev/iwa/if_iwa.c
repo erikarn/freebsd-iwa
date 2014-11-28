@@ -71,7 +71,25 @@ __FBSDID("$FreeBSD$");
 #include <dev/iwa/if_iwa_debug.h>
 #include <dev/iwa/if_iwa_firmware.h>
 #include <dev/iwa/if_iwavar.h>
+#include <dev/iwa/if_iwareg.h>
 
+#include <dev/iwa/iwl/iwl-csr.h>
+
+/*
+ * Populate the hardware ID.
+ *
+ * XXX TODO: The 8xxx series NICs have a slightly different
+ * register layout;  this needs to be updated before those
+ * NICs are supported!
+ */
+static void
+iwa_populate_hw_id(struct iwa_softc *sc)
+{
+	uint32_t hw_rev;
+
+	hw_rev = IWA_REG_READ(sc, CSR_HW_REV);
+	device_printf(sc->sc_dev, "%s: hw_rev=0x%08x\n", __func__, hw_rev);
+}
 
 int
 iwa_attach(struct iwa_softc *sc)
@@ -98,6 +116,9 @@ iwa_attach(struct iwa_softc *sc)
 	/* only one firmware possibility for now */
 	sc->sc_fw_name = IWM_FWNAME;
 	sc->sc_fw_dmasegsz = IWM_FWDMASEGSZ;
+
+	/* Read hardware revision */
+	iwa_populate_hw_id(sc);
 
 #if 0
 	/* Read hardware revision and attach. */
