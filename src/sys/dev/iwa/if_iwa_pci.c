@@ -158,6 +158,8 @@ iwa_pci_attach(device_t dev)
 
 	IWA_DPRINTF(sc, IWA_DEBUG_TRACE, "->%s: begin\n",__func__);
 
+	sc->subdevice_id = pci_get_subdevice(dev);
+
 	/*
 	 * Get the offset of the PCI Express Capability Structure in PCI
 	 * Configuration Space.
