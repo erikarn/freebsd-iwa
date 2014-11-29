@@ -736,10 +736,9 @@ static bool
 iwa_check_rfkill(struct iwa_softc *sc)
 {
 	uint32_t v;
-	int s;
 	bool rv;
-	
-	s = splnet();
+
+	/* XXX lock? */
 
 	/*
 	 * "documentation" is not really helpful here:
@@ -756,7 +755,6 @@ iwa_check_rfkill(struct iwa_softc *sc)
 		sc->sc_flags &= ~IWM_FLAG_RFKILL;
 	}
 
-	splx(s);
 	return rv;
 }
 
@@ -780,7 +778,7 @@ iwa_restore_interrupts(struct iwa_softc *sc)
 static void
 iwa_disable_interrupts(struct iwa_softc *sc)
 {
-	int s = splnet();
+	/* XXX lock? */
 
 	/* disable interrupts */
 	IWA_REG_WRITE(sc, CSR_INT_MASK, 0);
@@ -788,8 +786,6 @@ iwa_disable_interrupts(struct iwa_softc *sc)
 	/* acknowledge all interrupts */
 	IWA_REG_WRITE(sc, CSR_INT, ~0);
 	IWA_REG_WRITE(sc, CSR_FH_INT_STATUS, ~0);
-
-	splx(s);
 }
 
 static void
