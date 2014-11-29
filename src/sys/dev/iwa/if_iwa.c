@@ -102,6 +102,36 @@ iwa_populate_hw_id(struct iwa_softc *sc)
 		    (CSR_HW_REV_STEP(sc->sc_hw_rev << 2) << 2);
 }
 
+static int
+iwa_run_init_mvm_ucode(struct iwa_softc *sc, bool justnvm)
+{
+
+	/* XXX for now, noop */
+	device_printf(sc->sc_dev, "%s: called; NOOP for now\n", __func__);
+	return (0);
+}
+
+
+static int
+iwa_preinit(struct iwa_softc *sc)
+{
+	int error;
+
+	if ((error = iwa_prepare_card_hw(sc)) != 0)
+		return error;
+
+	if ((error = iwa_start_hw(sc)) != 0)
+		return error;
+
+	if ((error = iwa_run_init_mvm_ucode(sc, true)) != 0) {
+		return error;
+	}
+
+	iwa_stop_device(sc);
+	return 0;
+}
+
+
 int
 iwa_attach(struct iwa_softc *sc)
 {
@@ -191,6 +221,12 @@ iwa_attach(struct iwa_softc *sc)
 
 	/* Clear pending interrupts. */
 	IWA_REG_WRITE(sc, CSR_INT, 0xffffffff);
+
+	if ((error = iwa_preinit(sc)) != 0) {
+		device_printf(sc->sc_dev, "failed to init firmware: %d\n",
+		    error);
+		goto fail;
+	}
 
 #if 0
 	ifp = sc->sc_ifp = if_alloc(IFT_IEEE80211);

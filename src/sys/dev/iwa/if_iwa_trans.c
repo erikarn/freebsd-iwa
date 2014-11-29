@@ -1009,7 +1009,7 @@ iwa_apm_stop(struct iwa_softc *sc)
 }
 
 /* iwlwifi pcie/trans.c */
-static int
+int
 iwa_start_hw(struct iwa_softc *sc)
 {
 	int error;
@@ -1034,7 +1034,7 @@ iwa_start_hw(struct iwa_softc *sc)
 /* iwlwifi pcie/trans.c */
 /* philosophy: why is it "start hw" but "stop device"? */
 
-static void
+void
 iwa_stop_device(struct iwa_softc *sc)
 {
 	int chnl, ntries;
