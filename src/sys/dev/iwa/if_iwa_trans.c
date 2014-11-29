@@ -792,6 +792,8 @@ static void
 iwa_ict_reset(struct iwa_softc *sc)
 {
 
+	/* XXX lock */
+
 	iwa_disable_interrupts(sc);
 
 	/* Reset ICT table. */
@@ -818,6 +820,8 @@ iwa_ict_reset(struct iwa_softc *sc)
 static bool
 iwa_set_hw_ready(struct iwa_softc *sc)
 {
+
+	/* XXX lock */
 
 	iwa_set_bit(sc, CSR_HW_IF_CONFIG_REG,
 	    CSR_HW_IF_CONFIG_REG_BIT_NIC_READY);
