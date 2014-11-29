@@ -18,6 +18,15 @@
  */
 /* $FreeBSD$ */
 
+/* maximal number of Tx queues in any platform */
+#define IWA_MVM_MAX_QUEUES      20
+
+
+#define	IWM_FLAG_USE_ICT	0x01
+#define	IWM_FLAG_HW_INITED	0x02
+#define	IWM_FLAG_STOPPED	0x04
+#define	IWM_FLAG_RFKILL		0x08
+
 struct iwa_vap {
 	struct ieee80211vap	iv_vap;
 };
@@ -30,7 +39,7 @@ struct iwa_softc {
 
 	struct mtx		sc_mtx;
 
-	uint32_t 		hw_rev;
+	uint32_t 		sc_hw_rev;
 	/* subdevice_id used to adjust configuration */
 	uint16_t		subdevice_id;
 
@@ -43,18 +52,44 @@ struct iwa_softc {
 	bus_space_handle_t	sc_sh;
 	struct resource		*irq;
 	void			*sc_ih;
-//	bus_size_t		sc_sz;
+	bus_size_t		sc_sz;	/* XXX TODO: initialise? */
 	bus_dma_tag_t		sc_dmat;
 	int			sc_cap_off;
+
+	/* "Keep Warm" page. */
+	struct iwa_dma_info     kw_dma;
+
+	/* Firmware */
+	struct iwa_fw_info	sc_fw;
+
+	/* Firmware DMA transfer. */
+	struct iwa_dma_info	fw_dma;
+
+	/* TX scheduler rings. */
+	struct iwa_dma_info	sched_dma;
+	uint32_t		sched_base;
+
+	/* TX/RX rings. */
+	struct iwa_tx_ring txq[IWA_MVM_MAX_QUEUES];
+	struct iwa_rx_ring rxq;
+	int qfullmsk;
+
+	/* ICT table. */
+	struct iwa_dma_info	ict_dma;
+	uint32_t		*ict;
+	int			ict_cur;
+
+	/* Interrupts */
+	uint32_t		sc_intmask;
+
+	/* Operational flags */
+	uint32_t		sc_flags;
 
 	/* ifnet layer resources */
 	struct ifnet		*sc_ifp;
 
 	/* Taskqueue */
 	struct taskqueue	*sc_tq;
-
-	/* Firmware */
-	struct iwa_fw_info	sc_fw;
 
 	/* Configuration */
 	const struct iwl_cfg	*sc_cfg;

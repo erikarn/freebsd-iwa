@@ -6,6 +6,9 @@
 #define	IWA_REG_READ(sc, reg)						\
 	bus_space_read_4((sc)->sc_st, (sc)->sc_sh, (reg))
 
+#define	IWA_REG_READ_1(sc, reg)						\
+	bus_space_read_1((sc)->sc_st, (sc)->sc_sh, (reg))
+
 #define	IWA_REG_WRITE(sc, reg, val)					\
 	bus_space_write_4((sc)->sc_st, (sc)->sc_sh, (reg), (val))
 

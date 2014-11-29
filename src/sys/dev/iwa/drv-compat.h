@@ -16,6 +16,16 @@ typedef uint64_t u64;
 typedef uint16_t u16;
 typedef uint8_t u8;
 
+typedef int8_t s8;
+
+/* XXX le == signed or unsigned? */
+typedef uint8_t __le8;
+typedef uint16_t __le16;
+typedef uint32_t __le32;
+typedef uint64_t __le64;
+
+#define	le32_to_cpu(x)	le32toh(x)
+#define	le32_to_cpup(x)	le32toh(*x)
 
 /*
  * XXX XXXGPL this is from linux mac80211.h - whatever uses this needs
@@ -55,5 +65,8 @@ enum ieee80211_smps_mode {
 
 #define	IEEE80211_BAND_2GHZ	0
 #define	IEEE80211_BAND_5GHZ	1
+
+/* XXX TODO: should turn this into something useful */
+#define	WARN_ON_ONCE(x) do { if ( (!x) ) { printf("%s:%d: %s\n", __FILE__, __LINE__, #x); }} while (0)
 
 #endif	/* __IWA_DRV_COMPAT_H__ */

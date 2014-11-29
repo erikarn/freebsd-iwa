@@ -75,11 +75,11 @@ __FBSDID("$FreeBSD$");
 #include <dev/iwa/iwl/iwl-config.h>
 
 #include <dev/iwa/if_iwa_firmware.h>
+#include <dev/iwa/if_iwa_trans.h>
 #include <dev/iwa/if_iwavar.h>
 #include <dev/iwa/if_iwareg.h>
 
 #include <dev/iwa/iwl/iwl-csr.h>
-
 
 /*
  * Populate the hardware ID.
@@ -88,8 +88,8 @@ static void
 iwa_populate_hw_id(struct iwa_softc *sc)
 {
 
-	sc->hw_rev = IWA_REG_READ(sc, CSR_HW_REV);
-	device_printf(sc->sc_dev, "%s: hw_rev=0x%08x\n", __func__, sc->hw_rev);
+	sc->sc_hw_rev = IWA_REG_READ(sc, CSR_HW_REV);
+	device_printf(sc->sc_dev, "%s: hw_rev=0x%08x\n", __func__, sc->sc_hw_rev);
 
 	/*
 	 * In the 8000 HW family the format of the 4 bytes of CSR_HW_REV have
@@ -98,8 +98,8 @@ iwa_populate_hw_id(struct iwa_softc *sc)
 	 * in the old format.
 	 */
 	if (sc->sc_cfg->device_family == IWL_DEVICE_FAMILY_8000)
-		sc->hw_rev = (sc->hw_rev & 0xfff0) |
-		    (CSR_HW_REV_STEP(sc->hw_rev << 2) << 2);
+		sc->sc_hw_rev = (sc->sc_hw_rev & 0xfff0) |
+		    (CSR_HW_REV_STEP(sc->sc_hw_rev << 2) << 2);
 }
 
 int
@@ -111,6 +111,7 @@ iwa_attach(struct iwa_softc *sc)
 	uint8_t macaddr[IEEE80211_ADDR_LEN];
 #endif
 	int error;
+	int i;
 
 #ifdef	IWA_DEBUG
 	error = resource_int_value(device_get_name(sc->sc_dev),
@@ -131,75 +132,51 @@ iwa_attach(struct iwa_softc *sc)
 	/* Read hardware revision */
 	iwa_populate_hw_id(sc);
 
+	device_printf(sc->sc_dev,
+	    "hw rev: 0x%x, dash: %d, step: %d\n",
+	    sc->sc_hw_rev & CSR_HW_REV_TYPE_MSK,
+	    CSR_HW_REV_DASH(sc->sc_hw_rev),
+	    CSR_HW_REV_STEP(sc->sc_hw_rev));
+
 #if 0
-	/* Read hardware revision and attach. */
-	sc->hw_type = (IWN_READ(sc, IWN_HW_REV) >> IWN_HW_REV_TYPE_SHIFT)
-	    & IWN_HW_REV_TYPE_MASK;
-	sc->subdevice_id = pci_get_subdevice(dev);
-
-	/*
-	 * 4965 versus 5000 and later have different methods.
-	 * Let's set those up first.
-	 */
-	if (sc->hw_type == IWN_HW_REV_TYPE_4965)
-		error = iwn4965_attach(sc, pci_get_device(dev));
-	else
-		error = iwn5000_attach(sc, pci_get_device(dev));
-	if (error != 0) {
-		device_printf(dev, "could not attach device, error %d\n",
-		    error);
-		goto fail;
-	}
-
-	/*
-	 * Next, let's setup the various parameters of each NIC.
-	 */
-	error = iwn_config_specific(sc, pci_get_device(dev));
-	if (error != 0) {
-		device_printf(dev, "could not attach device, error %d\n",
-		    error);
-		goto fail;
-	}
 
 	if ((error = iwn_hw_prepare(sc)) != 0) {
 		device_printf(dev, "hardware not ready, error %d\n", error);
 		goto fail;
 	}
+#endif
 
 	/* Allocate DMA memory for firmware transfers. */
-	if ((error = iwn_alloc_fwmem(sc)) != 0) {
-		device_printf(dev,
+	if ((error = iwa_alloc_fwmem(sc)) != 0) {
+		device_printf(sc->sc_dev,
 		    "could not allocate memory for firmware, error %d\n",
 		    error);
 		goto fail;
 	}
 
 	/* Allocate "Keep Warm" page. */
-	if ((error = iwn_alloc_kw(sc)) != 0) {
-		device_printf(dev,
+	if ((error = iwa_alloc_kw(sc)) != 0) {
+		device_printf(sc->sc_dev,
 		    "could not allocate keep warm page, error %d\n", error);
 		goto fail;
 	}
 
-	/* Allocate ICT table for 5000 Series. */
-	if (sc->hw_type != IWN_HW_REV_TYPE_4965 &&
-	    (error = iwn_alloc_ict(sc)) != 0) {
-		device_printf(dev, "could not allocate ICT table, error %d\n",
+	if ((error = iwa_alloc_ict(sc)) != 0) {
+		device_printf(sc->sc_dev, "could not allocate ICT table, error %d\n",
 		    error);
 		goto fail;
 	}
 
 	/* Allocate TX scheduler "rings". */
-	if ((error = iwn_alloc_sched(sc)) != 0) {
-		device_printf(dev,
+	if ((error = iwa_alloc_sched(sc)) != 0) {
+		device_printf(sc->sc_dev,
 		    "could not allocate TX scheduler rings, error %d\n", error);
 		goto fail;
 	}
 
-	/* Allocate TX rings (16 on 4965AGN, 20 on >=5000). */
-	for (i = 0; i < sc->ntxqs; i++) {
-		if ((error = iwn_alloc_tx_ring(sc, &sc->txq[i], i)) != 0) {
-			device_printf(dev,
+	for (i = 0; i < sc->sc_cfg->base_params->num_of_queues; i++) {
+		if ((error = iwa_alloc_tx_ring(sc, &sc->txq[i], i)) != 0) {
+			device_printf(sc->sc_dev,
 			    "could not allocate TX ring %d, error %d\n", i,
 			    error);
 			goto fail;
@@ -207,15 +184,16 @@ iwa_attach(struct iwa_softc *sc)
 	}
 
 	/* Allocate RX ring. */
-	if ((error = iwn_alloc_rx_ring(sc, &sc->rxq)) != 0) {
-		device_printf(dev, "could not allocate RX ring, error %d\n",
+	if ((error = iwa_alloc_rx_ring(sc, &sc->rxq)) != 0) {
+		device_printf(sc->sc_dev, "could not allocate RX ring, error %d\n",
 		    error);
 		goto fail;
 	}
 
 	/* Clear pending interrupts. */
-	IWN_WRITE(sc, IWN_INT, 0xffffffff);
+	IWA_REG_WRITE(sc, CSR_INT, 0xffffffff);
 
+#if 0
 	ifp = sc->sc_ifp = if_alloc(IFT_IEEE80211);
 	if (ifp == NULL) {
 		device_printf(dev, "can not allocate ifnet structure\n");
@@ -382,21 +360,19 @@ iwa_attach(struct iwa_softc *sc)
 	IWA_DPRINTF(sc, IWA_DEBUG_TRACE, "->%s: end\n",__func__);
 	return 0;
 
-#if 0
 fail:
 	iwa_detach(sc);
 	IWA_DPRINTF(sc, IWA_DEBUG_TRACE, "->%s: end in error\n",__func__);
 	return (error);
-#endif
 }
 
 int
 iwa_detach(struct iwa_softc *sc)
 {
 	struct ifnet *ifp = sc->sc_ifp;
+	int qid;
 #if 0
 	struct ieee80211com *ic;
-	int qid;
 
 	DPRINTF(sc, IWN_DEBUG_TRACE, "->%s begin\n", __func__);
 
@@ -418,17 +394,14 @@ iwa_detach(struct iwa_softc *sc)
 	}
 #endif
 
-#if 0
 	/* Free DMA resources. */
-	iwn_free_rx_ring(sc, &sc->rxq);
-	for (qid = 0; qid < sc->ntxqs; qid++)
-		iwn_free_tx_ring(sc, &sc->txq[qid]);
-	iwn_free_sched(sc);
-	iwn_free_kw(sc);
-	if (sc->ict != NULL)
-		iwn_free_ict(sc);
-	iwn_free_fwmem(sc);
-#endif
+	iwa_free_rx_ring(sc, &sc->rxq);
+	for (qid = 0; qid < sc->sc_cfg->base_params->num_of_queues; qid++)
+		iwa_free_tx_ring(sc, &sc->txq[qid]);
+	iwa_free_sched(sc);
+	iwa_free_kw(sc);
+	iwa_free_ict(sc);
+	iwa_free_fwmem(sc);
 
 	if (ifp != NULL)
 		if_free(ifp);

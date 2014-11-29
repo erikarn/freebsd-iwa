@@ -71,6 +71,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/iwa/if_iwa_debug.h>
 
 #include <dev/iwa/if_iwa_firmware.h>
+#include <dev/iwa/if_iwa_trans.h>
 #include <dev/iwa/if_iwavar.h>
 
 /*

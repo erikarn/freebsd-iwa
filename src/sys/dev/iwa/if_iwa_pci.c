@@ -69,10 +69,14 @@ __FBSDID("$FreeBSD$");
 #include <net80211/ieee80211_ratectl.h>
 
 #include <dev/iwa/drv-compat.h>
+
+#include <dev/iwa/iwl/iwl-config.h>
+
 #include <dev/iwa/if_iwa_debug.h>
 #include <dev/iwa/if_iwa_firmware.h>
+#include <dev/iwa/if_iwa_trans.h>
 #include <dev/iwa/if_iwavar.h>
-#include <dev/iwa/iwl/iwl-config.h>
+
 
 
 struct iwa_ident {
