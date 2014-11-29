@@ -82,6 +82,8 @@ struct iwa_rx_ring {
  * External facing functions - should be trans ops methods!
  */
 extern	void iwa_set_pwr(struct iwa_softc *sc);
+extern	int iwa_prepare_card_hw(struct iwa_softc *sc);
+
 extern	int iwa_alloc_fwmem(struct iwa_softc *sc);
 extern	void iwa_free_fwmem(struct iwa_softc *sc);
 extern	int iwa_alloc_sched(struct iwa_softc *sc);

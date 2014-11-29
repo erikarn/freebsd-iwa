@@ -138,13 +138,12 @@ iwa_attach(struct iwa_softc *sc)
 	    CSR_HW_REV_DASH(sc->sc_hw_rev),
 	    CSR_HW_REV_STEP(sc->sc_hw_rev));
 
-#if 0
-
-	if ((error = iwn_hw_prepare(sc)) != 0) {
-		device_printf(dev, "hardware not ready, error %d\n", error);
+	if ((error = iwa_prepare_card_hw(sc)) != 0) {
+		device_printf(sc->sc_dev,
+		    "hardware not ready, error %d\n",
+		    error);
 		goto fail;
 	}
-#endif
 
 	/* Allocate DMA memory for firmware transfers. */
 	if ((error = iwa_alloc_fwmem(sc)) != 0) {

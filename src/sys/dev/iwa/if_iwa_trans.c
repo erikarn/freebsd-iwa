@@ -833,7 +833,7 @@ iwa_set_hw_ready(struct iwa_softc *sc)
 }
 #undef HW_READY_TIMEOUT
 
-static int
+int
 iwa_prepare_card_hw(struct iwa_softc *sc)
 {
 	int rv = 0;
