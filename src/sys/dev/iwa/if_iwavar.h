@@ -61,6 +61,7 @@ struct iwa_softc {
 
 	/* Firmware */
 	struct iwa_fw_info	sc_fw;
+	int			sc_fw_chunk_done;
 
 	/* Firmware DMA transfer. */
 	struct iwa_dma_info	fw_dma;
@@ -108,5 +109,6 @@ extern	int iwa_detach(struct iwa_softc *sc);
 extern	int iwa_shutdown(struct iwa_softc *sc);
 extern	int iwa_suspend(struct iwa_softc *sc);
 extern	int iwa_resume(struct iwa_softc *sc);
+extern	int iwa_intr(struct iwa_softc *sc);
 
 #endif	/* __IF_IWAVAR_H__ */

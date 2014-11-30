@@ -732,7 +732,7 @@ iwa_enable_rfkill_int(struct iwa_softc *sc)
 	IWA_REG_WRITE(sc, CSR_INT_MASK, sc->sc_intmask);
 }
 
-static bool
+bool
 iwa_check_rfkill(struct iwa_softc *sc)
 {
 	uint32_t v;
@@ -760,7 +760,7 @@ iwa_check_rfkill(struct iwa_softc *sc)
 
 /* all ints */
 
-static void
+void
 iwa_enable_interrupts(struct iwa_softc *sc)
 {
 
@@ -768,14 +768,14 @@ iwa_enable_interrupts(struct iwa_softc *sc)
 	IWA_REG_WRITE(sc, CSR_INT_MASK, sc->sc_intmask);
 }
 
-static void
+void
 iwa_restore_interrupts(struct iwa_softc *sc)
 {
 
 	IWA_REG_WRITE(sc, CSR_INT_MASK, sc->sc_intmask);
 }
 
-static void
+void
 iwa_disable_interrupts(struct iwa_softc *sc)
 {
 	/* XXX lock? */

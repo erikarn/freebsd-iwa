@@ -85,6 +85,10 @@ extern	void iwa_set_pwr(struct iwa_softc *sc);
 extern	int iwa_prepare_card_hw(struct iwa_softc *sc);
 extern	int iwa_start_hw(struct iwa_softc *sc);
 extern	void iwa_stop_device(struct iwa_softc *sc);
+extern	bool iwa_check_rfkill(struct iwa_softc *sc);
+extern	void iwa_enable_interrupts(struct iwa_softc *sc);
+extern	void iwa_restore_interrupts(struct iwa_softc *sc);
+extern	void iwa_disable_interrupts(struct iwa_softc *sc);
 
 extern	int iwa_alloc_fwmem(struct iwa_softc *sc);
 extern	void iwa_free_fwmem(struct iwa_softc *sc);

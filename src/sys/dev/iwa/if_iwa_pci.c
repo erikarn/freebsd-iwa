@@ -114,9 +114,12 @@ static int iwa_pci_detach(device_t dev);
 static void
 iwa_pci_intr(void *arg)
 {
+	int ret;
 	struct iwa_softc *sc = arg;
 
 	device_printf(sc->sc_dev, "%s: called\n", __func__);
+
+	ret = iwa_intr(sc);
 }
 
 static int

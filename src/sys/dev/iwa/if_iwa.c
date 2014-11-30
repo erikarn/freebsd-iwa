@@ -111,7 +111,6 @@ iwa_run_init_mvm_ucode(struct iwa_softc *sc, bool justnvm)
 	return (0);
 }
 
-
 static int
 iwa_preinit(struct iwa_softc *sc)
 {
@@ -131,6 +130,198 @@ iwa_preinit(struct iwa_softc *sc)
 	return 0;
 }
 
+static void
+iwa_notif_intr(struct iwa_softc *sc)
+{
+
+	device_printf(sc->sc_dev, "%s: called\n", __func__);
+}
+
+static void
+iwa_stop_locked(struct iwa_softc *sc, int disable)
+{
+
+	IWA_LOCK_ASSERT(sc);
+
+#if 0
+        struct ieee80211com *ic = &sc->sc_ic;
+
+        sc->sc_flags &= ~IWM_FLAG_HW_INITED;
+        sc->sc_flags |= IWM_FLAG_STOPPED;
+        sc->sc_generation++;
+        sc->sc_scanband = 0;
+        sc->sc_auth_prot = 0;
+#ifdef __OpenBSD__
+        ic->ic_scan_lock = IEEE80211_SCAN_UNLOCKED;
+#endif
+        ifp->if_flags &= ~(IFF_RUNNING | IFF_OACTIVE);
+
+        if (ic->ic_state != IEEE80211_S_INIT)
+                ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
+
+        ifp->if_timer = sc->sc_tx_timer = 0;
+#endif
+	iwa_stop_device(sc);
+}
+
+static void
+iwa_stop(struct ifnet *ifp, int disable)
+{
+	struct iwa_softc *sc = ifp->if_softc;
+
+	IWA_LOCK(sc);
+	iwa_stop_locked(sc, disable);
+	IWA_UNLOCK(sc);
+}
+
+int
+iwa_intr(struct iwa_softc *sc)
+{
+//	struct ifnet *ifp = sc->sc_ifp;
+	int handled = 0;
+	int r1, r2, rv = 0;
+	bool isperiodic = false;
+
+	IWA_LOCK(sc);
+
+	IWA_REG_WRITE(sc, CSR_INT_MASK, 0);
+
+	if (sc->sc_flags & IWM_FLAG_USE_ICT) {
+		uint32_t *ict = (void *) sc->ict_dma.vaddr;
+		int tmp;
+
+		tmp = htole32(ict[sc->ict_cur]);
+		if (!tmp)
+			goto out_ena;
+
+		/*
+		 * ok, there was something.  keep plowing until we have all.
+		 */
+		r1 = r2 = 0;
+		while (tmp) {
+			r1 |= tmp;
+			ict[sc->ict_cur] = 0;
+			sc->ict_cur = (sc->ict_cur+1) % IWM_ICT_COUNT;
+			tmp = htole32(ict[sc->ict_cur]);
+		}
+
+		/* this is where the fun begins.  don't ask */
+		if (r1 == 0xffffffff)
+			r1 = 0;
+
+		/* i am not expected to understand this */
+		if (r1 & 0xc0000)
+			r1 |= 0x8000;
+		r1 = (0xff & r1) | ((0xff00 & r1) << 16);
+	} else {
+		r1 = IWA_REG_READ(sc, CSR_INT);
+		/* "hardware gone" (where, fishing?) */
+		if (r1 == 0xffffffff || (r1 & 0xfffffff0) == 0xa5a5a5a0)
+			goto out;
+		r2 = IWA_REG_READ(sc, CSR_FH_INT_STATUS);
+	}
+	if (r1 == 0 && r2 == 0) {
+		goto out_ena;
+	}
+
+	IWA_REG_WRITE(sc, CSR_INT, r1 | ~sc->sc_intmask);
+
+	/* ignored */
+	handled |= (r1 & (CSR_INT_BIT_ALIVE /*| CSR_INT_BIT_SCD*/));
+
+	if (r1 & CSR_INT_BIT_SW_ERR) {
+#if 0
+		int i;
+
+		iwm_nic_error(sc);
+
+		/* Dump driver status (TX and RX rings) while we're here. */
+		aprint_error("driver status:\n");
+		for (i = 0; i < IWL_MVM_MAX_QUEUES; i++) {
+			struct iwm_tx_ring *ring = &sc->txq[i];
+			aprint_error("  tx ring %2d: qid=%-2d cur=%-3d "
+			    "queued=%-3d\n",
+			    i, ring->qid, ring->cur, ring->queued);
+		}
+		aprint_error("  rx ring: cur=%d\n", sc->rxq.cur);
+		aprint_error("  802.11 state %d\n", sc->sc_ic.ic_state);
+#endif
+
+		device_printf(sc->sc_dev,
+		    "firmware error, stopping device\n");
+//		ifp->if_flags &= ~IFF_UP;
+		iwa_stop_locked(sc, 1);
+		rv = 1;
+		goto out;
+
+	}
+
+	if (r1 & CSR_INT_BIT_HW_ERR) {
+		handled |= CSR_INT_BIT_HW_ERR;
+		device_printf(sc->sc_dev,
+		    "hardware error, stopping device \n");
+//		ifp->if_flags &= ~IFF_UP;
+		iwa_stop_locked(sc, 1);
+		rv = 1;
+		goto out;
+	}
+
+	/* firmware chunk loaded */
+	if (r1 & CSR_INT_BIT_FH_TX) {
+		IWA_REG_WRITE(sc, CSR_FH_INT_STATUS, CSR_FH_INT_TX_MASK);
+		handled |= CSR_INT_BIT_FH_TX;
+
+		sc->sc_fw_chunk_done = true;
+		wakeup(&sc->sc_fw);
+	}
+
+	if (r1 & CSR_INT_BIT_RF_KILL) {
+		handled |= CSR_INT_BIT_RF_KILL;
+//		if (iwa_check_rfkill(sc) && (ifp->if_flags & IFF_UP)) {
+		if (iwa_check_rfkill(sc)) {
+			device_printf(sc->sc_dev,
+			    "rfkill switch, disabling interface\n");
+//			ifp->if_flags &= ~IFF_UP;
+			iwa_stop_locked(sc, 1);
+		}
+	}
+
+	/*
+	 * The Linux driver uses periodic interrupts to avoid races.
+	 * We cargo-cult like it's going out of fashion.
+	 */
+	if (r1 & CSR_INT_BIT_RX_PERIODIC) {
+		handled |= CSR_INT_BIT_RX_PERIODIC;
+		IWA_REG_WRITE(sc, CSR_INT, CSR_INT_BIT_RX_PERIODIC);
+		if ((r1 & (CSR_INT_BIT_FH_RX | CSR_INT_BIT_SW_RX)) == 0)
+			IWA_REG_WRITE_1(sc,
+			    CSR_INT_PERIODIC_REG, CSR_INT_PERIODIC_DIS);
+		isperiodic = true;
+	}
+
+	if ((r1 & (CSR_INT_BIT_FH_RX | CSR_INT_BIT_SW_RX)) || isperiodic) {
+		handled |= (CSR_INT_BIT_FH_RX | CSR_INT_BIT_SW_RX);
+		IWA_REG_WRITE(sc, CSR_FH_INT_STATUS, CSR_FH_INT_RX_MASK);
+
+		iwa_notif_intr(sc);
+
+		/* enable periodic interrupt, see above */
+		if (r1 & (CSR_INT_BIT_FH_RX | CSR_INT_BIT_SW_RX) && !isperiodic)
+			IWA_REG_WRITE_1(sc, CSR_INT_PERIODIC_REG, CSR_INT_PERIODIC_ENA);
+	}
+
+	if (__predict_false(r1 & ~handled))
+		device_printf(sc->sc_dev, "unhandled interrupts: %x\n", r1);
+	rv = 1;
+
+out_ena:
+	iwa_restore_interrupts(sc);
+out:
+
+	IWA_UNLOCK(sc);
+
+	return rv;
+}
 
 int
 iwa_attach(struct iwa_softc *sc)
