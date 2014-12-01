@@ -214,7 +214,7 @@ iwa_pci_attach(device_t dev)
 	if (sc->irq == NULL) {
 		device_printf(dev, "can't map interrupt\n");
 		error = ENOMEM;
-		goto bad1;
+		goto bad;
 	}
 
 	/* Setup interrupt handler */
@@ -225,7 +225,7 @@ iwa_pci_attach(device_t dev)
 	    sc,
 	    &sc->sc_ih)) {
 		device_printf(dev, "could not establish interrupt\n");
-		goto bad2;
+		goto bad;
 	}
 
 	/* Setup DMA descriptor area */
@@ -251,7 +251,7 @@ iwa_pci_attach(device_t dev)
 	    NULL,                    /* lockarg */
 	    &sc->sc_dmat)) {
 		device_printf(dev, "cannot allocate DMA tag\n");
-		goto bad3;
+		goto bad;
 	}
 
 	IWA_LOCK_INIT(sc);
@@ -265,14 +265,23 @@ iwa_pci_attach(device_t dev)
 	device_printf(sc->sc_dev, "%s: iwa_attach_failed\n", __func__);
 	IWA_LOCK_DESTROY(sc);
 
-//bad4:
-        bus_dma_tag_destroy(sc->sc_dmat);
-bad3:
-        bus_teardown_intr(dev, sc->irq, sc->sc_ih);
-bad2:
-	bus_release_resource(dev, SYS_RES_IRQ, 0, sc->irq);
-bad1:
-	bus_release_resource(dev, SYS_RES_MEMORY, PCIR_BAR(0), sc->mem);
+	bus_dma_tag_destroy(sc->sc_dmat);
+
+bad:
+	if (sc->irq) {
+		if (sc->sc_ih)
+			bus_teardown_intr(dev, sc->irq, sc->sc_ih);
+		bus_release_resource(dev,
+		    SYS_RES_IRQ,
+		    rman_get_rid(sc->irq),
+		    sc->irq);
+		pci_release_msi(dev);
+	}
+	if (sc->mem)
+		bus_release_resource(dev,
+		    SYS_RES_MEMORY,
+		    rman_get_rid(sc->mem),
+		    sc->mem);
 
 	IWA_DPRINTF(sc, IWA_DEBUG_TRACE, "->%s: end in error\n",__func__);
 	return (error);
