@@ -17,6 +17,7 @@ typedef uint16_t u16;
 typedef uint8_t u8;
 
 typedef int8_t s8;
+typedef int8_t __s8;
 
 /* XXX le == signed or unsigned? */
 typedef uint8_t __le8;
@@ -24,8 +25,14 @@ typedef uint16_t __le16;
 typedef uint32_t __le32;
 typedef uint64_t __le64;
 
+typedef uint32_t __be32;
+
 #define	le32_to_cpu(x)	le32toh(x)
 #define	le32_to_cpup(x)	le32toh(*x)
+
+#define	ETH_ALEN	6
+
+#define	dma_addr_t bus_addr_t
 
 /*
  * XXX XXXGPL this is from linux mac80211.h - whatever uses this needs
@@ -50,6 +57,8 @@ enum ieee80211_smps_mode {
         /* keep last */
         IEEE80211_SMPS_NUM_MODES,
 };
+
+#define	IEEE80211_MAX_SSID_LEN 32
 
 /*
  * XXX XXXGPL from Linux include/linux/stringify.h
