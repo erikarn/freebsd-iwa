@@ -65,8 +65,10 @@
 #ifndef __fw_api_bt_coex_h__
 #define __fw_api_bt_coex_h__
 
+#if 0
 #include <linux/types.h>
 #include <linux/bitops.h>
+#endif
 
 #define BITS(nb) (BIT(nb) - 1)
 
