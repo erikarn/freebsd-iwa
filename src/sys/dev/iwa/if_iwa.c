@@ -73,13 +73,14 @@ __FBSDID("$FreeBSD$");
 #include <dev/iwa/drv-compat.h>
 
 #include <dev/iwa/iwl/iwl-config.h>
+#include <dev/iwa/iwl/iwl-csr.h>
+#include <dev/iwa/iwl/iwl-fw.h>
 
 #include <dev/iwa/if_iwa_firmware.h>
 #include <dev/iwa/if_iwa_trans.h>
 #include <dev/iwa/if_iwavar.h>
 #include <dev/iwa/if_iwareg.h>
 
-#include <dev/iwa/iwl/iwl-csr.h>
 
 /*
  * Populate the hardware ID.
@@ -102,19 +103,93 @@ iwa_populate_hw_id(struct iwa_softc *sc)
 		    (CSR_HW_REV_STEP(sc->sc_hw_rev << 2) << 2);
 }
 
+/*
+ * follows iwlwifi/fw.c
+ */
 static int
 iwa_run_init_mvm_ucode(struct iwa_softc *sc, bool justnvm)
 {
+        int error;
 
-	/* XXX for now, noop */
-	device_printf(sc->sc_dev, "%s: called; NOOP for now\n", __func__);
-	return (0);
+	IWA_LOCK_ASSERT(sc);
+
+	device_printf(sc->sc_dev, "%s: started\n", __func__);
+
+        /* do not operate with rfkill switch turned on */
+        if ((sc->sc_flags & IWM_FLAG_RFKILL) && !justnvm) {
+                device_printf(sc->sc_dev, "rfkill active, no go\n");
+                return EPERM;
+        }
+
+	/*
+	 * Note: the firmware must be loaded by the caller.
+	 */
+
+        sc->sc_init_complete = false;
+        if ((error = iwa_mvm_load_ucode_wait_alive(sc,
+            IWL_UCODE_INIT)) != 0)
+                return error;
+
+        if (justnvm) {
+		device_printf(sc->sc_dev, "%s: TODO: iwa_nvm_init\n", __func__);
+#if 0
+                if ((error = iwa_nvm_init(sc)) != 0) {
+                        device_printf(sc->sc_dev, "failed to read nvm\n");
+                        return error;
+                }
+                device_printf(sc->sc_dev, "MAC address: %s\n",
+                    ether_sprintf(sc->sc_nvm.hw_addr));
+                memcpy(&sc->sc_ic.ic_myaddr,
+                    &sc->sc_nvm.hw_addr, ETHER_ADDR_LEN);
+
+                sc->sc_scan_cmd_len = sizeof(struct iwl_scan_cmd)
+                    + sc->sc_capa_max_probe_len
+                    + MAX_NUM_SCAN_CHANNELS * sizeof(struct iwl_scan_channel);
+                sc->sc_scan_cmd = iwa_malloc(sc->sc_scan_cmd_len, true);
+#endif
+                return 0;
+        }
+
+#if 0
+        /* Send TX valid antennas before triggering calibrations */
+        if ((error = iwa_send_tx_ant_cfg(sc, IWM_FW_VALID_TX_ANT(sc))) != 0)
+                return error;
+
+        /*
+        * Send phy configurations command to init uCode
+        * to start the 16.0 uCode init image internal calibrations.
+        */
+        if ((error = iwa_send_phy_cfg_cmd(sc)) != 0 ) {
+                device_printf(sc->sc_dev, "Failed to run INIT "
+                    "calibrations: %d\n", error);
+                return error;
+        }
+
+        /*
+         * Nothing to do but wait for the init complete notification
+         * from the firmware
+         */
+        while (!sc->sc_init_complete)
+                if ((error = tsleep(&sc->sc_init_complete,
+                    0, "iwminit", 2*hz)) != 0)
+                        break;
+
+        return error;
+#endif
+        return (EINVAL);
 }
 
+/*
+ * Pre-initialise the hardware.
+ *
+ * The firmware must already have been loaded.
+ */
 static int
 iwa_preinit(struct iwa_softc *sc)
 {
 	int error;
+
+	IWA_LOCK_ASSERT(sc);
 
 	if ((error = iwa_prepare_card_hw(sc)) != 0)
 		return error;
@@ -270,7 +345,7 @@ iwa_intr(struct iwa_softc *sc)
 	if (r1 & CSR_INT_BIT_FH_TX) {
 		IWA_REG_WRITE(sc, CSR_FH_INT_STATUS, CSR_FH_INT_TX_MASK);
 		handled |= CSR_INT_BIT_FH_TX;
-
+		device_printf(sc->sc_dev, "%s: called; FH_TX set\n", __func__);
 		sc->sc_fw_chunk_done = true;
 		wakeup(&sc->sc_fw);
 	}
@@ -302,7 +377,6 @@ iwa_intr(struct iwa_softc *sc)
 	if ((r1 & (CSR_INT_BIT_FH_RX | CSR_INT_BIT_SW_RX)) || isperiodic) {
 		handled |= (CSR_INT_BIT_FH_RX | CSR_INT_BIT_SW_RX);
 		IWA_REG_WRITE(sc, CSR_FH_INT_STATUS, CSR_FH_INT_RX_MASK);
-
 		iwa_notif_intr(sc);
 
 		/* enable periodic interrupt, see above */
@@ -338,16 +412,14 @@ iwa_attach(struct iwa_softc *sc)
 	error = resource_int_value(device_get_name(sc->sc_dev),
 	    device_get_unit(sc->sc_dev), "debug", &(sc->sc_debug));
 	if (error != 0)
-		sc->sc_debug = 0;
+		sc->sc_debug = 0xffffffff;
 #else
-	sc->sc_debug = 0;
+	sc->sc_debug = 0xffffffff;
 #endif
 
 	IWA_DPRINTF(sc, IWA_DEBUG_TRACE, "->%s: begin\n",__func__);
 
 	/* Setup initial firmware details */
-	/* only one firmware possibility for now */
-	sc->sc_fw_name = IWM_FWNAME;
 	sc->sc_fw_dmasegsz = IWM_FWDMASEGSZ;
 
 	/* Read hardware revision */
@@ -410,14 +482,28 @@ iwa_attach(struct iwa_softc *sc)
 		goto fail;
 	}
 
+	/*
+	 * Load initial firmware - do this before the lock is grabbed.
+	 */
+	if ((error = iwa_find_firmware(sc)) != 0) {
+		device_printf(sc->sc_dev, "firmware load failed; error %d\n",
+		    error);
+		goto fail;
+	}
+
+	IWA_LOCK(sc);
+
 	/* Clear pending interrupts. */
 	IWA_REG_WRITE(sc, CSR_INT, 0xffffffff);
 
 	if ((error = iwa_preinit(sc)) != 0) {
 		device_printf(sc->sc_dev, "failed to init firmware: %d\n",
 		    error);
+		IWA_UNLOCK(sc);
 		goto fail;
 	}
+
+	IWA_UNLOCK(sc);
 
 #if 0
 	ifp = sc->sc_ifp = if_alloc(IFT_IEEE80211);
@@ -620,6 +706,8 @@ iwa_detach(struct iwa_softc *sc)
 	}
 #endif
 
+	IWA_LOCK(sc);
+
 	/* Free DMA resources. */
 	iwa_free_rx_ring(sc, &sc->rxq);
 	for (qid = 0; qid < sc->sc_cfg->base_params->num_of_queues; qid++)
@@ -628,6 +716,8 @@ iwa_detach(struct iwa_softc *sc)
 	iwa_free_kw(sc);
 	iwa_free_ict(sc);
 	iwa_free_fwmem(sc);
+
+	IWA_UNLOCK(sc);
 
 	if (ifp != NULL)
 		if_free(ifp);

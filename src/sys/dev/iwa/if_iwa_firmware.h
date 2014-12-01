@@ -2,7 +2,6 @@
 #define	__IF_IWA_FIRMWARE_H__
 
 
-#define	IWM_UCODE_SECT_MAX	6
 #define	IWM_FWNAME		"iwa_fw_7260_7"
 #define	IWM_FWDMASEGSZ		(192*1024)
 /* sanity check value */
@@ -17,14 +16,14 @@
 #define FW_STATUS_INPROGRESS    1
 #define FW_STATUS_DONE          2
 
-enum iwm_ucode_type {
-        IWM_UCODE_TYPE_INIT,
-        IWM_UCODE_TYPE_REGULAR,
-        IWM_UCODE_TYPE_WOW,
-        IWM_UCODE_TYPE_MAX
-};
-
 struct iwa_softc;
+
+struct iwa_ucode_status {
+	uint32_t uc_error_event_table;
+	uint32_t uc_log_event_table;
+	bool uc_ok;
+	bool uc_intr;
+};
 
 struct iwa_fw_info {
         void *fw_rawdata;
@@ -39,13 +38,14 @@ struct iwa_fw_info {
 
                         void *fws_alloc;
                         size_t fws_allocsize;
-                } fw_sect[IWM_UCODE_SECT_MAX];
+                } fw_sect[IWL_UCODE_SECTION_MAX];
                 size_t fw_totlen;
                 int fw_count;
-        } fw_sects[IWM_UCODE_TYPE_MAX];
+        } fw_sects[IWL_UCODE_TYPE_MAX];
 };
 
-extern	int if_iwa_firmware_load(struct iwa_softc *sc, struct iwa_fw_info *fw,
-	    const char *fwname);
+extern	int iwa_find_firmware(struct iwa_softc *sc);
+extern	int iwa_mvm_load_ucode_wait_alive(struct iwa_softc *sc,
+	    enum iwl_ucode_type ucode_type);
 
 #endif	/* __IF_IWA_FIRMWARE_H__ */

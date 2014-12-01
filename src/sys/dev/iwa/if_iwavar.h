@@ -43,9 +43,6 @@ struct iwa_softc {
 	/* subdevice_id used to adjust configuration */
 	uint16_t		subdevice_id;
 
-	const char		*sc_fw_name;
-	bus_size_t		sc_fw_dmasegsz;
-
 	/* Driver bus resources */
 	struct resource		*mem;
 	bus_space_tag_t		sc_st;
@@ -62,9 +59,17 @@ struct iwa_softc {
 	/* Firmware */
 	struct iwa_fw_info	sc_fw;
 	int			sc_fw_chunk_done;
+	int			sc_init_complete;
+	enum iwl_ucode_type	sc_uc_current;
+	struct iwa_ucode_status sc_uc;
+	int			sc_fw_phy_config;
+	int			sc_fwver;
+	int			sc_capa_max_probe_len;
+	int			sc_capaflags;
 
 	/* Firmware DMA transfer. */
 	struct iwa_dma_info	fw_dma;
+	bus_size_t		sc_fw_dmasegsz;
 
 	/* TX scheduler rings. */
 	struct iwa_dma_info	sched_dma;
@@ -94,6 +99,9 @@ struct iwa_softc {
 
 	/* Configuration */
 	const struct iwl_cfg	*sc_cfg;
+
+	/* Calibration */
+	struct iwl_tlv_calib_ctrl sc_default_calib[IWL_UCODE_TYPE_MAX];
 };
 
 #define IWA_LOCK_INIT(_sc) \
@@ -101,6 +109,7 @@ struct iwa_softc {
 	    MTX_NETWORK_LOCK, MTX_DEF)
 #define IWA_LOCK(_sc)			mtx_lock(&(_sc)->sc_mtx)
 #define IWA_LOCK_ASSERT(_sc)		mtx_assert(&(_sc)->sc_mtx, MA_OWNED)
+#define IWA_UNLOCK_ASSERT(_sc)		mtx_assert(&(_sc)->sc_mtx, MA_NOTOWNED)
 #define IWA_UNLOCK(_sc)			mtx_unlock(&(_sc)->sc_mtx)
 #define IWA_LOCK_DESTROY(_sc)		mtx_destroy(&(_sc)->sc_mtx)
 

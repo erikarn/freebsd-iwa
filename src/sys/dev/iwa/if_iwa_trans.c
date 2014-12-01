@@ -78,7 +78,12 @@ __FBSDID("$FreeBSD$");
 #include <dev/iwa/iwl/iwl-trans.h>
 #include <dev/iwa/iwl/iwl-prph.h>
 
-/* XXX wtf */
+/*
+ * XXX wtf - anything referencing this isn't supposed
+ * to be in the PCIe transaction layer!
+ */
+#include <dev/iwa/iwl/iwl-fw.h>	/* XXX */
+#include <dev/iwa/iwl/mvm/fw-api.h>
 #include <dev/iwa/iwl/mvm/fw-api-tx.h>
 
 #include <dev/iwa/if_iwa_firmware.h>
@@ -103,8 +108,6 @@ __FBSDID("$FreeBSD$");
  * It's all a bit of a mess.
  */
 
-static bool iwa_grab_nic_access(struct iwa_softc *sc);
-static void iwa_release_nic_access(struct iwa_softc *sc);
 static void iwa_dma_contig_free(struct iwa_dma_info *dma);
 
 static uint32_t
@@ -234,7 +237,7 @@ iwa_poll_bit(struct iwa_softc *sc, int reg,
 	}
 }
 
-static bool
+bool
 iwa_grab_nic_access(struct iwa_softc *sc)
 {
 	bool rv = false;
@@ -253,7 +256,7 @@ iwa_grab_nic_access(struct iwa_softc *sc)
 	return rv;
 }
 
-static void
+void
 iwa_release_nic_access(struct iwa_softc *sc)
 {
 
@@ -1117,3 +1120,285 @@ iwa_set_pwr(struct iwa_softc *sc)
 	    APMG_PS_CTRL_VAL_PWR_SRC_VMAIN, ~APMG_PS_CTRL_MSK_PWR_SRC);
 }
 
+/* iwlwifi: mvm/ops.c */
+/*
+ * XXX shouldn't be in this file; this doesn't really
+ * have anything to do with the PCIe layer.
+ */
+static void
+iwa_mvm_nic_config(struct iwa_softc *sc)
+{
+	uint8_t radio_cfg_type, radio_cfg_step, radio_cfg_dash;
+	uint32_t reg_val = 0;
+
+	IWA_LOCK_ASSERT(sc);
+
+	radio_cfg_type = (sc->sc_fw_phy_config & FW_PHY_CFG_RADIO_TYPE) >>
+	    FW_PHY_CFG_RADIO_TYPE_POS;
+	radio_cfg_step = (sc->sc_fw_phy_config & FW_PHY_CFG_RADIO_STEP) >>
+	    FW_PHY_CFG_RADIO_STEP_POS;
+	radio_cfg_dash = (sc->sc_fw_phy_config & FW_PHY_CFG_RADIO_DASH) >>
+	    FW_PHY_CFG_RADIO_DASH_POS;
+
+	/* SKU control */
+	reg_val |= CSR_HW_REV_STEP(sc->sc_hw_rev) <<
+	    CSR_HW_IF_CONFIG_REG_POS_MAC_STEP;
+	reg_val |= CSR_HW_REV_DASH(sc->sc_hw_rev) <<
+	    CSR_HW_IF_CONFIG_REG_POS_MAC_DASH;
+
+	/* radio configuration */
+	reg_val |= radio_cfg_type << CSR_HW_IF_CONFIG_REG_POS_PHY_TYPE;
+	reg_val |= radio_cfg_step << CSR_HW_IF_CONFIG_REG_POS_PHY_STEP;
+	reg_val |= radio_cfg_dash << CSR_HW_IF_CONFIG_REG_POS_PHY_DASH;
+
+	/* silicon bits */
+	reg_val |= CSR_HW_IF_CONFIG_REG_BIT_RADIO_SI;
+
+	iwa_set_bits_mask(sc, CSR_HW_IF_CONFIG_REG,
+	    CSR_HW_IF_CONFIG_REG_MSK_MAC_DASH |
+	    CSR_HW_IF_CONFIG_REG_MSK_MAC_STEP |
+	    CSR_HW_IF_CONFIG_REG_MSK_PHY_TYPE |
+	    CSR_HW_IF_CONFIG_REG_MSK_PHY_STEP |
+	    CSR_HW_IF_CONFIG_REG_MSK_PHY_DASH |
+	    CSR_HW_IF_CONFIG_REG_BIT_RADIO_SI |
+	    CSR_HW_IF_CONFIG_REG_BIT_MAC_SI,
+	    reg_val);
+
+	device_printf(sc->sc_dev,
+	    "Radio type=0x%x-0x%x-0x%x\n", radio_cfg_type,
+	    radio_cfg_step, radio_cfg_dash);
+
+	/*
+	 * W/A : NIC is stuck in a reset state after Early PCIe power off
+	 * (PCIe power is lost before PERST# is asserted), causing ME FW
+	 * to lose ownership and not being able to obtain it back.
+	 */
+	iwa_set_bits_mask_prph(sc, APMG_PS_CTRL_REG,
+	    APMG_PS_CTRL_EARLY_PWR_OFF_RESET_DIS,
+	    ~APMG_PS_CTRL_EARLY_PWR_OFF_RESET_DIS);
+}
+
+static void
+iwa_enable_txq(struct iwa_softc *sc, int qid, int fifo)
+{
+
+	IWA_LOCK_ASSERT(sc);
+
+	if (!iwa_grab_nic_access(sc)) {
+		device_printf(sc->sc_dev, "cannot enable txq %d\n", qid);
+		return;
+	}
+
+	/* unactivate before configuration */
+	iwa_write_prph(sc, SCD_QUEUE_STATUS_BITS(qid),
+	    (0 << SCD_QUEUE_STTS_REG_POS_ACTIVE)
+	    | (1 << SCD_QUEUE_STTS_REG_POS_SCD_ACT_EN));
+
+	if (qid != IWL_MVM_CMD_QUEUE) {
+		iwa_set_bits_prph(sc, SCD_QUEUECHAIN_SEL, BIT(qid));
+	}
+
+	iwa_clear_bits_prph(sc, SCD_AGGR_SEL, BIT(qid));
+
+	IWA_REG_WRITE(sc, HBUS_TARG_WRPTR, qid << 8 | 0);
+	iwa_write_prph(sc, SCD_QUEUE_RDPTR(qid), 0);
+
+	iwa_write_mem32(sc, sc->sched_base + SCD_CONTEXT_QUEUE_OFFSET(qid), 0);
+	/* Set scheduler window size and frame limit. */
+	iwa_write_mem32(sc,
+	    sc->sched_base + SCD_CONTEXT_QUEUE_OFFSET(qid) + sizeof(uint32_t),
+		((IWL_FRAME_LIMIT << SCD_QUEUE_CTX_REG2_WIN_SIZE_POS) &
+		  SCD_QUEUE_CTX_REG2_WIN_SIZE_MSK) |
+		((IWL_FRAME_LIMIT << SCD_QUEUE_CTX_REG2_FRAME_LIMIT_POS) &
+		  SCD_QUEUE_CTX_REG2_FRAME_LIMIT_MSK));
+
+	iwa_write_prph(sc, SCD_QUEUE_STATUS_BITS(qid),
+	    (1 << SCD_QUEUE_STTS_REG_POS_ACTIVE) |
+	    (fifo << SCD_QUEUE_STTS_REG_POS_TXF) |
+	    (1 << SCD_QUEUE_STTS_REG_POS_WSL) |
+	    SCD_QUEUE_STTS_REG_MSK);
+
+	iwa_release_nic_access(sc);
+
+	device_printf(sc->sc_dev,
+	    "enabled txq %d FIFO %d\n",
+	    qid,
+	    fifo);
+}
+
+int
+iwa_nic_rx_init(struct iwa_softc *sc)
+{
+
+	IWA_LOCK_ASSERT(sc);
+
+	if (!iwa_grab_nic_access(sc))
+		return EBUSY;
+
+	/*
+	 * Initialize RX ring.  This is from the iwn driver.
+	 */
+	memset(sc->rxq.stat, 0, sizeof(*sc->rxq.stat));
+
+	/* stop DMA */
+	IWA_REG_WRITE(sc, FH_MEM_RCSR_CHNL0_CONFIG_REG, 0);
+	IWA_REG_WRITE(sc, FH_MEM_RCSR_CHNL0_RBDCB_WPTR, 0);
+	IWA_REG_WRITE(sc, FH_MEM_RCSR_CHNL0_FLUSH_RB_REQ, 0);
+	IWA_REG_WRITE(sc, FH_RSCSR_CHNL0_RDPTR, 0);
+	IWA_REG_WRITE(sc, FH_RSCSR_CHNL0_RBDCB_WPTR_REG, 0);
+
+	/* Set physical address of RX ring (256-byte aligned). */
+	IWA_REG_WRITE(sc,
+	    FH_RSCSR_CHNL0_RBDCB_BASE_REG, sc->rxq.desc_dma.paddr >> 8);
+
+	/* Set physical address of RX status (16-byte aligned). */
+	IWA_REG_WRITE(sc,
+	    FH_RSCSR_CHNL0_STTS_WPTR_REG, sc->rxq.stat_dma.paddr >> 4);
+
+	/* Enable RX. */
+	/*
+	 * Note: Linux driver also sets this:
+	 *  (RX_RB_TIMEOUT << FH_RCSR_RX_CONFIG_REG_IRQ_RBTH_POS) |
+	 *
+	 * It causes weird behavior.  YMMV.
+	 */
+	IWA_REG_WRITE(sc, FH_MEM_RCSR_CHNL0_CONFIG_REG,
+	    FH_RCSR_RX_CONFIG_CHNL_EN_ENABLE_VAL		  |
+	    FH_RCSR_CHNL0_RX_IGNORE_RXF_EMPTY			  |  /* HW bug */
+	    FH_RCSR_CHNL0_RX_CONFIG_IRQ_DEST_INT_HOST_VAL	  |
+	    FH_RCSR_RX_CONFIG_REG_VAL_RB_SIZE_4K		  |
+	    RX_QUEUE_SIZE_LOG << FH_RCSR_RX_CONFIG_RBDCB_SIZE_POS);
+
+	IWA_REG_WRITE_1(sc, CSR_INT_COALESCING, IWL_HOST_INT_TIMEOUT_DEF);
+	iwa_set_bit(sc, CSR_INT_COALESCING, IWL_HOST_INT_OPER_MODE);
+
+	/*
+	 * Thus sayeth el jefe (iwlwifi) via a comment:
+	 *
+	 * This value should initially be 0 (before preparing any
+	 * RBs), should be 8 after preparing the first 8 RBs (for example)
+	 */
+	IWA_REG_WRITE(sc, FH_RSCSR_CHNL0_WPTR, 8);
+
+	iwa_release_nic_access(sc);
+
+	return 0;
+}
+
+int
+iwa_nic_tx_init(struct iwa_softc *sc)
+{
+	int qid;
+
+	IWA_LOCK_ASSERT(sc);
+
+	if (!iwa_grab_nic_access(sc))
+		return EBUSY;
+
+	/* Deactivate TX scheduler. */
+	iwa_write_prph(sc, SCD_TXFACT, 0);
+
+	/* Set physical address of "keep warm" page (16-byte aligned). */
+	IWA_REG_WRITE(sc, FH_KW_MEM_ADDR_REG, sc->kw_dma.paddr >> 4);
+
+	/* Initialize TX rings. */
+#define	N(a)    (sizeof(a)/sizeof(a[0]))
+	for (qid = 0; qid < N(sc->txq); qid++) {
+		struct iwa_tx_ring *txq = &sc->txq[qid];
+
+		/* Set physical address of TX ring (256-byte aligned). */
+		IWA_REG_WRITE(sc, FH_MEM_CBBC_QUEUE(qid),
+		    txq->desc_dma.paddr >> 8);
+		IWA_DPRINTF(sc, IWA_DEBUG_RESET | IWA_DEBUG_TX,
+		    "loading ring %d descriptors (%p) at %llx\n",
+		    qid, txq->desc, (long long) (txq->desc_dma.paddr >> 8));
+	}
+	iwa_release_nic_access(sc);
+#undef N
+
+	return 0;
+}
+
+int
+iwa_nic_init(struct iwa_softc *sc)
+{
+	int error;
+
+	IWA_LOCK_ASSERT(sc);
+
+	iwa_apm_init(sc);
+	iwa_set_pwr(sc);
+
+	iwa_mvm_nic_config(sc);
+
+	if ((error = iwa_nic_rx_init(sc)) != 0)
+		return error;
+
+	/*
+	 * Ditto for TX, from iwn
+	 */
+	if ((error = iwa_nic_tx_init(sc)) != 0)
+		return error;
+
+	device_printf(sc->sc_dev,
+	    "shadow registers enabled\n");
+	iwa_set_bit(sc, CSR_MAC_SHADOW_REG_CTRL, 0x800fffff);
+
+        return 0;
+}
+
+int
+iwa_post_alive(struct iwa_softc *sc)
+{
+	int nwords;
+	int error, chnl;
+
+	IWA_LOCK_ASSERT(sc);
+
+	if (!iwa_grab_nic_access(sc))
+		return EBUSY;
+
+	if (sc->sched_base != iwa_read_prph(sc, SCD_SRAM_BASE_ADDR)) {
+		device_printf(sc->sc_dev, "sched addr mismatch");
+		error = EINVAL;
+		goto out;
+	}
+
+	iwa_ict_reset(sc);
+
+	/* Clear TX scheduler state in SRAM. */
+	nwords = (SCD_TRANS_TBL_MEM_UPPER_BOUND - SCD_CONTEXT_MEM_LOWER_BOUND)
+	    / sizeof(uint32_t);
+	error = iwa_write_mem(sc, sc->sched_base + SCD_CONTEXT_MEM_LOWER_BOUND,
+	    NULL, nwords);
+	if (error)
+		goto out;
+
+	/* Set physical address of TX scheduler rings (1KB aligned). */
+	iwa_write_prph(sc, SCD_DRAM_BASE_ADDR, sc->sched_dma.paddr >> 10);
+
+	iwa_write_prph(sc, SCD_CHAINEXT_EN, 0);
+
+	/* enable command channel */
+	iwa_enable_txq(sc, IWL_MVM_CMD_QUEUE, 7);
+
+	iwa_write_prph(sc, SCD_TXFACT, 0xff);
+
+	/* Enable DMA channels. */
+	for (chnl = 0; chnl < FH_TCSR_CHNL_NUM; chnl++) {
+		IWA_REG_WRITE(sc, FH_TCSR_CHNL_TX_CONFIG_REG(chnl),
+		    FH_TCSR_TX_CONFIG_REG_VAL_DMA_CHNL_ENABLE |
+		    FH_TCSR_TX_CONFIG_REG_VAL_DMA_CREDIT_ENABLE);
+	}
+
+	iwa_set_bit(sc,
+	    FH_TX_CHICKEN_BITS_REG, FH_TX_CHICKEN_BITS_SCD_AUTO_RETRY_EN);
+
+        /* Enable L1-Active */
+	iwa_clear_bits_prph(sc, APMG_PCIDEV_STT_REG,
+	    APMG_PCIDEV_STT_VAL_L1_ACT_DIS);
+
+out:
+	iwa_release_nic_access(sc);
+	return error;
+}

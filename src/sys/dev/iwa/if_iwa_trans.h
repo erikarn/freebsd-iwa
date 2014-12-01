@@ -89,6 +89,12 @@ extern	bool iwa_check_rfkill(struct iwa_softc *sc);
 extern	void iwa_enable_interrupts(struct iwa_softc *sc);
 extern	void iwa_restore_interrupts(struct iwa_softc *sc);
 extern	void iwa_disable_interrupts(struct iwa_softc *sc);
+extern	bool iwa_grab_nic_access(struct iwa_softc *sc);
+extern	void iwa_release_nic_access(struct iwa_softc *sc);
+extern	int iwa_nic_rx_init(struct iwa_softc *sc);
+extern	int iwa_nic_tx_init(struct iwa_softc *sc);
+extern	int iwa_nic_init(struct iwa_softc *sc);
+extern	int iwa_post_alive(struct iwa_softc *sc);
 
 extern	int iwa_alloc_fwmem(struct iwa_softc *sc);
 extern	void iwa_free_fwmem(struct iwa_softc *sc);
@@ -107,11 +113,5 @@ extern	int iwa_alloc_tx_ring(struct iwa_softc *sc, struct iwa_tx_ring *ring,
 	    int qid);
 extern	void iwa_reset_tx_ring(struct iwa_softc *sc, struct iwa_tx_ring *ring);
 extern	void iwa_free_tx_ring(struct iwa_softc *sc, struct iwa_tx_ring *ring);
-
-
-
-
-
-
 
 #endif	/* __IF_IWA_TRANS_H__ */
