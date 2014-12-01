@@ -225,6 +225,7 @@ iwa_pci_attach(device_t dev)
 	    sc,
 	    &sc->sc_ih)) {
 		device_printf(dev, "could not establish interrupt\n");
+		error = ENXIO;
 		goto bad;
 	}
 
@@ -251,12 +252,13 @@ iwa_pci_attach(device_t dev)
 	    NULL,                    /* lockarg */
 	    &sc->sc_dmat)) {
 		device_printf(dev, "cannot allocate DMA tag\n");
+		error = ENXIO;
 		goto bad;
 	}
 
 	IWA_LOCK_INIT(sc);
 
-	if (iwa_attach(sc) == 0) {
+	if ((error = iwa_attach(sc)) == 0) {
 		IWA_DPRINTF(sc, IWA_DEBUG_TRACE, "->%s: end\n",__func__);
 		return (0);
 	}
