@@ -397,6 +397,14 @@ out:
 	return rv;
 }
 
+/*
+ * XXX TODO - we can't assume interrupts are available at attach() time,
+ * so this whole "load initial firmware at attach time" has to either stop
+ * and be deferred until interface up, or it needs to use some polling
+ * of the status registers to verify things are up.
+ *
+ * .. grr.
+ */
 int
 iwa_attach(struct iwa_softc *sc)
 {
@@ -431,6 +439,7 @@ iwa_attach(struct iwa_softc *sc)
 	    CSR_HW_REV_DASH(sc->sc_hw_rev),
 	    CSR_HW_REV_STEP(sc->sc_hw_rev));
 
+	/* XXX do we need this; we do it down in preinit() */
 	if ((error = iwa_prepare_card_hw(sc)) != 0) {
 		device_printf(sc->sc_dev,
 		    "hardware not ready, error %d\n",
