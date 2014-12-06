@@ -734,10 +734,9 @@ iwa_detach(struct iwa_softc *sc)
 int
 iwa_shutdown(struct iwa_softc *sc)
 {
-#if 0
-	struct iwa_softc *sc = device_get_softc(dev);
 
-	iwn_stop(sc);
+#if 0
+	iwa_stop(sc->sc_ifp, 1);
 #endif
 	return 0;
 }
