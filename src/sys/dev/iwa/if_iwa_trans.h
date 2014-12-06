@@ -11,6 +11,30 @@
  * and transmit/receive/command ring management code here.
  */
 
+/*
+ * The linux iwlwifi driver uses a 16-bit little endian
+ * field called 'sequence' in the iwl_cmd_header struct.
+ *
+ * Bits 0:14 are user-settable and get copied from a
+ * driver-issued command into the response - this is how
+ * the driver can map RX'ed command responses to their
+ * initial TX'ed commands.
+ *
+ * Bit 15 is set if the response was firmware generated,
+ * rather than a response to a driver-sent command.
+ *
+ * These macros translate the host-order bits into
+ * the field (and vice versa.)  The caller should
+ * do the le16 translation.
+ */
+
+#define	IWA_SEQ_TO_IDX(v)	((v) & 0xff)
+#define	IWA_SEQ_TO_QID(v)	(((v) >> 8) & 0x1f)
+#define	IWA_SEQ_TO_UCODE_RX(v)	((v) & 0x8000)
+
+/* And now, assembling the idx/qid entry */
+#define	IWA_IDX_QID_TO_SEQ(s, q)	(((s) & 0xff) | (((q) & 0x1f) << 8))
+
 struct iwa_dma_info {
         bus_dma_tag_t           tag;
         bus_dmamap_t            map;
@@ -95,6 +119,11 @@ extern	int iwa_nic_rx_init(struct iwa_softc *sc);
 extern	int iwa_nic_tx_init(struct iwa_softc *sc);
 extern	int iwa_nic_init(struct iwa_softc *sc);
 extern	int iwa_post_alive(struct iwa_softc *sc);
+
+/* bus things that should go into if_iwareg.h */
+extern	void iwa_clear_bit(struct iwa_softc *sc, int reg, uint32_t bit);
+extern	void iwa_set_bits_mask(struct iwa_softc *sc, int reg, uint32_t mask,
+	    uint32_t bits);
 
 extern	int iwa_alloc_fwmem(struct iwa_softc *sc);
 extern	void iwa_free_fwmem(struct iwa_softc *sc);

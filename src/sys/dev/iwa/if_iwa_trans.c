@@ -194,9 +194,9 @@ iwa_write_mem32(struct iwa_softc *sc, uint32_t addr, uint32_t val)
  * Convenience routines for bit and burger flipping
  */
 
-static void
+void
 iwa_set_bits_mask(struct iwa_softc *sc,
-	int reg, uint32_t mask, uint32_t bits)
+    int reg, uint32_t mask, uint32_t bits)
 {
 	uint32_t val;
 
@@ -213,7 +213,7 @@ iwa_set_bit(struct iwa_softc *sc, int reg, uint32_t bit)
 	iwa_set_bits_mask(sc, reg, bit, bit);
 }
 
-static void
+void
 iwa_clear_bit(struct iwa_softc *sc, int reg, uint32_t bit)
 {
 
