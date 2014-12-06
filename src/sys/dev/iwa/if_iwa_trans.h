@@ -121,9 +121,12 @@ extern	int iwa_nic_init(struct iwa_softc *sc);
 extern	int iwa_post_alive(struct iwa_softc *sc);
 
 /* bus things that should go into if_iwareg.h */
+extern	void iwa_set_bit(struct iwa_softc *sc, int reg, uint32_t bit);
 extern	void iwa_clear_bit(struct iwa_softc *sc, int reg, uint32_t bit);
 extern	void iwa_set_bits_mask(struct iwa_softc *sc, int reg, uint32_t mask,
 	    uint32_t bits);
+extern	bool iwa_poll_bit(struct iwa_softc *sc, int reg,
+	    uint32_t bits, uint32_t mask, int timo);
 
 extern	int iwa_alloc_fwmem(struct iwa_softc *sc);
 extern	void iwa_free_fwmem(struct iwa_softc *sc);

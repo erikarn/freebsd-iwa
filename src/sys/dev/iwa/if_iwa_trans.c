@@ -206,7 +206,7 @@ iwa_set_bits_mask(struct iwa_softc *sc,
 	IWA_REG_WRITE(sc, reg, val);
 }
 
-static void
+void
 iwa_set_bit(struct iwa_softc *sc, int reg, uint32_t bit)
 {
 
@@ -220,7 +220,7 @@ iwa_clear_bit(struct iwa_softc *sc, int reg, uint32_t bit)
 	iwa_set_bits_mask(sc, reg, bit, 0);
 }
 
-static bool
+bool
 iwa_poll_bit(struct iwa_softc *sc, int reg,
 	uint32_t bits, uint32_t mask, int timo)
 {
