@@ -81,6 +81,8 @@ __FBSDID("$FreeBSD$");
 #include <dev/iwa/if_iwavar.h>
 #include <dev/iwa/if_iwareg.h>
 
+#include <dev/iwa/if_iwa_rx.h>
+
 
 /*
  * Populate the hardware ID.
@@ -203,13 +205,6 @@ iwa_preinit(struct iwa_softc *sc)
 
 	iwa_stop_device(sc);
 	return 0;
-}
-
-static void
-iwa_notif_intr(struct iwa_softc *sc)
-{
-
-	device_printf(sc->sc_dev, "%s: called\n", __func__);
 }
 
 static void

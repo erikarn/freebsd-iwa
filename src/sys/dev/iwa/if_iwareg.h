@@ -1,6 +1,9 @@
 #ifndef	__IF_IWAREG_H__
 #define	__IF_IWAREG_H__
 
+/*
+ * Register access macros.
+ */
 #define	IWA_LSB(x)	((((x) - 1) & (x)) ^ (x))
 
 #define	IWA_REG_READ(sc, reg)						\
@@ -28,6 +31,5 @@
 #define	IWA_REG_BARRIER_READ_WRITE(sc)					\
 	bus_space_barrier((sc)->sc_st, (sc)->sc_sh, 0, (sc)->sc_sz,	\
 	    BUS_SPACE_BARRIER_READ | BUS_SPACE_BARRIER_WRITE)
-
 
 #endif	/* __IF_IWAREG_H__ */
