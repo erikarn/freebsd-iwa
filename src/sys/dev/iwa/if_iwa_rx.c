@@ -222,6 +222,15 @@ iwa_notif_intr(struct iwa_softc *sc)
 			break; }
 
 		case NVM_ACCESS_CMD:
+			/*
+			 * XXX TODO: should we put it into the origin
+			 * command structure now, and do the wakeup?
+			 * Or just handle it after this chunk?
+			 */
+			/*
+			 * XXX TODO: why is this differently treated
+			 * to the command block below?
+			 */
 #if 0
 			if (sc->sc_wantresp == ((qid << 16) | idx)) {
 				bus_dmamap_sync(sc->sc_dmat, data->map,
@@ -249,6 +258,11 @@ iwa_notif_intr(struct iwa_softc *sc)
 		case TXPATH_FLUSH:
 		case LQ_CMD:
 			SYNC_RESP_STRUCT(cresp, pkt);
+			/*
+			 * XXX TODO: should we put it into the origin
+			 * command structure now, and do the wakeup?
+			 * Or just handle it after this chunk?
+			 */
 #if 0
 			if (sc->sc_wantresp == ((qid << 16) | idx)) {
 				memcpy(sc->sc_cmd_resp,
