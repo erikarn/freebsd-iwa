@@ -124,6 +124,10 @@ iwa_send_cmd(struct iwa_softc *sc, struct iwl_host_cmd *hcmd)
 	}
 #undef	N
 
+	/*
+	 * Unlike openbsd, we're going to sleep on the individual
+	 * command slot entries.
+	 */
 #if 0
 	/* if the command wants an answer, busy sc_cmd_resp */
 	if (wantresp) {
@@ -255,6 +259,56 @@ iwa_send_cmd(struct iwa_softc *sc, struct iwl_host_cmd *hcmd)
 	 * all of those descriptors _when_ we free the driver,
 	 * or we may end up with stuck threads on unload!
 	 */
+	if (! async) {
+		int cnt = 0;
+		/*
+		 * For now, we're going to do a timed sleep
+		 * on the transmit ring entry.
+		 *
+		 * XXX The OpenBSD driver implemented a generation
+		 * count so commands sent to the hardware across
+		 * things like configuration changes and such
+		 * would error out.
+		 *
+		 * I'm not going to do that just yet (iwn didn't
+		 * implement this) but it's entirely possible
+		 * that I'm going to have to.
+		 */
+		/* XXX 5 second command wait for now */
+		for (cnt = 0; cnt < 5; cnt++) {
+			device_printf(sc->sc_dev,
+			    "%s: msleep'ing on %p\n",
+			    __func__,
+			    desc);
+			error = msleep(desc, &sc->sc_mtx,
+			    PCATCH,
+			    "iwacmd",
+			    hz);
+			if (error == EWOULDBLOCK)
+				continue;
+			if (error == 0)
+				break;
+		}
+		if (error != 0) {
+			device_printf(sc->sc_dev,
+			    "%s: msleep failed; error=%d\n",
+			    __func__,
+			    error);
+			goto out;
+		}
+
+		/*
+		 * XXX TODO: store the response data that we
+		 * were just handed into the sent command.
+		 */
+		device_printf(sc->sc_dev,
+		    "%s: sleep completed; continue!\n",
+		    __func__);
+		/*
+		 * XXX we fall through right now to have
+		 * the code below just error out anyway.
+		 */
+	}
 
 #if 0
 	/*
@@ -279,7 +333,6 @@ iwa_send_cmd(struct iwa_softc *sc, struct iwl_host_cmd *hcmd)
 	}
 #endif
 out:
-
 	/*
 	 * We don't wait for a response, so if we want one,
 	 * free the response data and return an error (for now)
@@ -422,6 +475,11 @@ iwa_cmd_done(struct iwa_softc *sc, struct iwl_rx_packet *pkt)
 	qid = IWA_SEQ_TO_QID(le16toh(pkt->hdr.sequence));
 	idx = IWA_SEQ_TO_IDX(le16toh(pkt->hdr.sequence));
 
+	device_printf(sc->sc_dev, "%s: called; qid=%d, idx=%d\n",
+	    __func__,
+	    qid,
+	    idx);
+
 #if 0
 	if (pkt->hdr.qid != IWL_MVM_CMD_QUEUE) {
 		return;	/* Not a command ack. */
@@ -437,6 +495,12 @@ iwa_cmd_done(struct iwa_softc *sc, struct iwl_rx_packet *pkt)
 
 	data = &ring->data[idx];
 
+	/*
+	 * XXX TODO: I really should use this as the opportunity
+	 * to pass in the response and copy said response
+	 * to the original ring slot so the caller can get at it.
+	 */
+
 	/* If the command was mapped in an mbuf, free it. */
 	if (data->m != NULL) {
 		bus_dmamap_sync(sc->sc_dmat, data->map, BUS_DMASYNC_POSTWRITE);
@@ -446,5 +510,10 @@ iwa_cmd_done(struct iwa_softc *sc, struct iwl_rx_packet *pkt)
 	}
 
 	/* This wakes up anything sleeping on the specific slot */
+	device_printf(sc->sc_dev,
+	    "%s: waking up %p\n",
+	    __func__,
+	    &ring->desc[idx]);
+
 	wakeup(&ring->desc[idx]);
 }
