@@ -78,6 +78,7 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/iwa/if_iwa_firmware.h>
 #include <dev/iwa/if_iwa_trans.h>
+#include <dev/iwa/if_iwa_nvm.h>
 #include <dev/iwa/if_iwavar.h>
 #include <dev/iwa/if_iwareg.h>
 
@@ -135,13 +136,13 @@ iwa_run_init_mvm_ucode(struct iwa_softc *sc, bool justnvm)
 	if (justnvm) {
 		device_printf(sc->sc_dev, "%s: TODO: iwa_nvm_init\n", __func__);
 
-#if 0
 	if ((error = iwa_nvm_init(sc)) != 0) {
 		device_printf(sc->sc_dev, "failed to read nvm\n");
 		return (error);
 	}
 	device_printf(sc->sc_dev, "MAC address: %s\n",
 	    ether_sprintf(sc->sc_nvm.hw_addr));
+#if 0
 	memcpy(&sc->sc_ic.ic_myaddr,
 	    &sc->sc_nvm.hw_addr,
 	    ETHER_ADDR_LEN);
@@ -257,6 +258,11 @@ iwa_intr(struct iwa_softc *sc)
 	IWA_LOCK(sc);
 
 	IWA_REG_WRITE(sc, CSR_INT_MASK, 0);
+
+	if (sc->sc_inactive == 1) {
+		IWA_UNLOCK(sc);
+		return (0);
+	}
 
 	if (sc->sc_flags & IWM_FLAG_USE_ICT) {
 		uint32_t *ict = (void *) sc->ict_dma.vaddr;

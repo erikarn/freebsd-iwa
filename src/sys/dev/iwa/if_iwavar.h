@@ -39,6 +39,8 @@ struct iwa_softc {
 
 	struct mtx		sc_mtx;
 
+	int			sc_inactive;
+
 	uint32_t 		sc_hw_rev;
 	/* subdevice_id used to adjust configuration */
 	uint16_t		subdevice_id;
@@ -70,6 +72,9 @@ struct iwa_softc {
 	/* Firmware DMA transfer. */
 	struct iwa_dma_info	fw_dma;
 	bus_size_t		sc_fw_dmasegsz;
+
+	/* NVRAM */
+	struct iwa_nvm_data	sc_nvm;
 
 	/* TX scheduler rings. */
 	struct iwa_dma_info	sched_dma;

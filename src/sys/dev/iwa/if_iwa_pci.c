@@ -76,6 +76,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/iwa/if_iwa_debug.h>
 #include <dev/iwa/if_iwa_firmware.h>
 #include <dev/iwa/if_iwa_trans.h>
+#include <dev/iwa/if_iwa_nvm.h>
 #include <dev/iwa/if_iwavar.h>
 
 struct iwa_ident {
@@ -264,6 +265,23 @@ iwa_pci_attach(device_t dev)
 
 	/* iwa_attach() failed */
 	device_printf(sc->sc_dev, "%s: iwa_attach_failed\n", __func__);
+
+	/*
+	 * if the interrupt thread is already running, we need
+	 * to ensure it isn't running before we destroy the mutex.
+	 *
+	 * Otherwise the interrupt thread (that's running) will
+	 * have the lock and destroying the mutex will cause hilarity.
+	 */
+	IWA_LOCK(sc);
+	sc->sc_inactive = 1;
+	IWA_UNLOCK(sc);
+
+	/*
+	 * XXX TODO:
+	 * ... ideally we'd shut down the interrupt first, far
+	 * before this happens.
+	 */
 	IWA_LOCK_DESTROY(sc);
 
 	bus_dma_tag_destroy(sc->sc_dmat);

@@ -79,6 +79,7 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/iwa/if_iwa_firmware.h>
 #include <dev/iwa/if_iwa_trans.h>
+#include <dev/iwa/if_iwa_nvm.h>
 #include <dev/iwa/if_iwavar.h>
 #include <dev/iwa/if_iwareg.h>
 
@@ -107,7 +108,7 @@ iwa_send_cmd(struct iwa_softc *sc, struct iwl_host_cmd *hcmd)
 	struct mbuf *m;
 	bus_addr_t paddr;
 	uint32_t addr_lo;
-	int error, i, paylen, off;
+	int error = 0, i, paylen, off;
 	int code;
 	bool async, wantresp;
 
