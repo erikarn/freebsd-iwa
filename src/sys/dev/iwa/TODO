@@ -1,0 +1,7 @@
+* Go through and fix / implement XXX, TODO, etc
+
+* When shutting down a TX ring (in preparation for NIC free, NIC suspend, etc)
+  we should wakeup anything waiting on each of the TX ring slots.
+  Otherwise we may leak memory and/or leave OS threads hung waiting for
+  a wakeup to occur.
+
