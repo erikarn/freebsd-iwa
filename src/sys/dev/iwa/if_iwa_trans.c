@@ -300,7 +300,7 @@ iwa_clear_bits_prph(struct iwa_softc *sc, uint32_t reg, uint32_t bits)
  * DMA resource routines
  */
 
-static void
+void
 iwa_dma_map_addr(void *arg, bus_dma_segment_t *segs, int nsegs, int error)
 {
 
@@ -461,6 +461,7 @@ iwa_rx_addbuf(struct iwa_softc *sc, struct iwa_rx_ring *ring,
 		error = ENOBUFS;
 		goto fail;
 	}
+	m->m_pkthdr.len = m->m_len = m->m_ext.ext_size;
 
 	error = bus_dmamap_load(ring->data_dmat, ring->data[idx].map,
 	    mtod(m, void *), IWA_RBUF_SIZE, iwa_dma_map_addr,

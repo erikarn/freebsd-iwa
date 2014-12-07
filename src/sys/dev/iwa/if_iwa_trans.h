@@ -102,6 +102,10 @@ struct iwa_rx_ring {
         int                     cur;
 };
 
+/* Bus method */
+extern	void iwa_dma_map_addr(void *arg, bus_dma_segment_t *segs,
+	    int nsegs, int error);
+
 /*
  * External facing functions - should be trans ops methods!
  */
