@@ -102,6 +102,7 @@ int
 iwa_send_cmd(struct iwa_softc *sc, struct iwl_host_cmd *hcmd)
 {
 	struct iwa_tx_ring *ring = &sc->txq[IWL_MVM_CMD_QUEUE];
+	struct iwa_tx_ring_meta *meta = &sc->txq_meta[IWL_MVM_CMD_QUEUE];
 	struct iwl_tfd *desc;
 	struct iwa_tx_data *data;
 	struct iwl_device_cmd *cmd;
@@ -111,6 +112,7 @@ iwa_send_cmd(struct iwa_softc *sc, struct iwl_host_cmd *hcmd)
 	int error = 0, i, paylen, off;
 	int code;
 	bool async, wantresp;
+	int ring_idx;
 
 	code = hcmd->id;
 	async = hcmd->flags & CMD_ASYNC;
@@ -152,6 +154,11 @@ iwa_send_cmd(struct iwa_softc *sc, struct iwl_host_cmd *hcmd)
 		goto out;
 	}
 
+	/*
+	 * Make sure we have a copy of the original ring
+	 * pointer that contains our metadata
+	 */
+	ring_idx = ring->cur;
 	desc = &ring->desc[ring->cur];
 	data = &ring->data[ring->cur];
 
@@ -177,6 +184,7 @@ iwa_send_cmd(struct iwa_softc *sc, struct iwl_host_cmd *hcmd)
 		m->m_pkthdr.len = m->m_len = m->m_ext.ext_size;
 
 		cmd = mtod(m, struct iwl_device_cmd *);
+		/* XXX TODO hcmd->len[0] is wrong? It's not the full length */
 		error = bus_dmamap_load(sc->sc_dmat, data->map, cmd,
 		    hcmd->len[0], iwa_dma_map_addr, &paddr, BUS_DMA_NOWAIT);
 		if (error != 0) {
@@ -247,6 +255,17 @@ iwa_send_cmd(struct iwa_softc *sc, struct iwl_host_cmd *hcmd)
 	    "sending command 0x%x qid %d, idx %d\n",
 	    code, ring->qid, ring->cur);
 
+	/*
+	 * If we're waiting for a response, then setup the
+	 * meta pointer to point to us.  Else, set it to NULL
+	 * so things don't get confused.
+	 */
+	if (wantresp) {
+		meta->meta[ring->cur] = hcmd;
+	} else {
+		meta->meta[ring->cur] = NULL;
+	}
+
 	/* Kick command ring. */
 	ring->cur = (ring->cur + 1) % IWA_TX_RING_COUNT;
 	IWA_REG_WRITE(sc, HBUS_TARG_WRPTR, ring->qid << 8 | ring->cur);
@@ -294,62 +313,47 @@ iwa_send_cmd(struct iwa_softc *sc, struct iwl_host_cmd *hcmd)
 			    "%s: msleep failed; error=%d\n",
 			    __func__,
 			    error);
+			/*
+			 * We've failed; so we won't be
+			 * handling any command status that
+			 * are handed to us past this point.
+			 */
+			meta->meta[ring_idx] = NULL;
 			goto out;
 		}
 
-		/*
-		 * XXX TODO: store the response data that we
-		 * were just handed into the sent command.
-		 */
 		device_printf(sc->sc_dev,
 		    "%s: sleep completed; continue!\n",
 		    __func__);
-		/*
-		 * XXX we fall through right now to have
-		 * the code below just error out anyway.
-		 */
+		/* We've received our command response */
+		meta->meta[ring_idx] = NULL;
 	}
 
-#if 0
 	/*
-	 * XXX note the global cmd response? ew.
-	 * XXX How do we grab the response packet and hand it back?
-	 * XXX Is there a way that iwn(4) does this, or does it
-	 *     not provide a sleep-and-wait-for-the-response-to-this
-	 *     command? Hm!
+	 * At this point iwa_cmd_done() has set resp_pkt / resp_obj
+	 * for us as appropriate.
 	 */
-	if (!async) {
-		/* m..m-mmyy-mmyyyy-mym-ym m-my generation */
-		int generation = sc->sc_generation;
-		error = tsleep(desc, PCATCH, "iwacmd", hz);
-		if (error == 0) {
-			/* if hardware is no longer up, return error */
-			if (generation != sc->sc_generation) {
-				error = ENXIO;
-			} else {
-				hcmd->resp_pkt = (void *)sc->sc_cmd_resp;
-			}
-		}
-	}
-#endif
+
 out:
-	/*
-	 * We don't wait for a response, so if we want one,
-	 * free the response data and return an error (for now)
-	 */
-	if (wantresp) {
-		if (error == 0)
-			error = EBUSY;
-		device_printf(sc->sc_dev, "%s: called; wantresp=1; not implemented\n",
-		    __func__);
-		iwa_free_resp(sc, hcmd);
-	}
-#if 0
 	/* If we hit an error and we have a response, free it here */
 	if (wantresp && error != 0) {
 		iwa_free_resp(sc, hcmd);
 	}
-#endif
+
+	/*
+	 * If we were waiting for a response and
+	 * the response data is NULL, return ENOMEM
+	 * instead of okay but with NULL pointers.
+	 *
+	 * This way the caller doesn't think everything
+	 * is okay and tries dereferencing things.
+	 */
+	if (wantresp && error == 0 && hcmd->resp_pkt == NULL) {
+		device_printf(sc->sc_dev,
+		    "%s: woke up OK but resp_pkt == NULL\n",
+		    __func__);
+		error = ENOMEM;
+	}
 
 	return error;
 }
@@ -462,14 +466,12 @@ iwa_free_resp(struct iwa_softc *sc, struct iwl_host_cmd *hcmd)
 
 	IWA_LOCK_ASSERT(sc);
 
-	device_printf(sc->sc_dev, "%s: called!\n", __func__);
-#if 0
-	KASSERT(sc->sc_wantresp != -1, (""));
-	KASSERT((hcmd->flags & (CMD_WANT_SKB))
-	    == (CMD_WANT_SKB), (""));
-	sc->sc_wantresp = -1;
-	wakeup(&sc->sc_wantresp);
-#endif
+	device_printf(sc->sc_dev, "%s: called!; pkt=%p, m=%p\n",
+	    __func__,
+	    hcmd->resp_pkt,
+	    hcmd->resp_obj);
+	if (hcmd->resp_obj)
+		m_freem((struct mbuf *) hcmd->resp_obj);
 }
 
 /*
@@ -486,9 +488,10 @@ iwa_free_resp(struct iwa_softc *sc, struct iwl_host_cmd *hcmd)
  * from if_iwn
  */
 void
-iwa_cmd_done(struct iwa_softc *sc, struct iwl_rx_packet *pkt)
+iwa_cmd_done(struct iwa_softc *sc, struct iwl_rx_packet *pkt, struct mbuf *m)
 {
 	struct iwa_tx_ring *ring = &sc->txq[IWL_MVM_CMD_QUEUE];
+	struct iwa_tx_ring_meta *meta = &sc->txq_meta[IWL_MVM_CMD_QUEUE];
 	struct iwa_tx_data *data;
 	int qid, idx;
 
@@ -497,31 +500,26 @@ iwa_cmd_done(struct iwa_softc *sc, struct iwl_rx_packet *pkt)
 	qid = IWA_SEQ_TO_QID(le16toh(pkt->hdr.sequence));
 	idx = IWA_SEQ_TO_IDX(le16toh(pkt->hdr.sequence));
 
-	device_printf(sc->sc_dev, "%s: called; qid=%d, idx=%d\n",
+	device_printf(sc->sc_dev, "%s: called; qid=%d, idx=%d; pkt=%p, m=%p\n",
 	    __func__,
 	    qid,
-	    idx);
+	    idx,
+	    pkt,
+	    m);
 
-#if 0
-	if (pkt->hdr.qid != IWL_MVM_CMD_QUEUE) {
-		return;	/* Not a command ack. */
-	}
-#endif
 	if (qid != IWL_MVM_CMD_QUEUE) {
 		device_printf(sc->sc_dev,
 		    "%s: seq=%04x; not cmd queue?\n",
 		    __func__,
 		    le16toh(pkt->hdr.sequence));
-		return;	/* Not a command ack. */
+		/* Not a command ack. */
+		goto error;
 	}
 
-	data = &ring->data[idx];
-
 	/*
-	 * XXX TODO: I really should use this as the opportunity
-	 * to pass in the response and copy said response
-	 * to the original ring slot so the caller can get at it.
+	 * Get the tx buffer for the original sent command.
 	 */
+	data = &ring->data[idx];
 
 	/* If the command was mapped in an mbuf, free it. */
 	if (data->m != NULL) {
@@ -531,6 +529,43 @@ iwa_cmd_done(struct iwa_softc *sc, struct iwl_rx_packet *pkt)
 		data->m = NULL;
 	}
 
+	/*
+	 * Put the mbuf into the original request, so the
+	 * responder can use it as appropriate and then
+	 * free it.
+	 *
+	 * There's no link at the moment from the TX command
+	 * ring slot entry to the original command that originated
+	 * things.  I'm going to have to add this.
+	 */
+	if (meta->meta[idx] != NULL) {
+		/* Need to squirrel things away as appropriate */
+		struct iwl_host_cmd *hcmd = meta->meta[idx];
+
+		/*
+		 * If m is NULL, we can't hand the buffer to our
+		 * caller.  So send NULL pointers back; the
+		 * rest of iwa_cmd_done() will check this and
+		 * return an error as appropriate.
+		 */
+		if (m == NULL) {
+			hcmd->resp_pkt = NULL;
+			hcmd->resp_obj = NULL;
+		} else {
+			hcmd->resp_pkt = pkt;
+			hcmd->resp_obj = (void *) m;
+		}
+
+		/*
+		 * The wakeup will now kick the waiting
+		 * client to free things.
+		 */
+	} else {
+		/* Nothing to squirrel away; just free */
+		if (m != NULL)
+			m_freem(m);
+	}
+
 	/* This wakes up anything sleeping on the specific slot */
 	device_printf(sc->sc_dev,
 	    "%s: waking up %p\n",
@@ -538,4 +573,11 @@ iwa_cmd_done(struct iwa_softc *sc, struct iwl_rx_packet *pkt)
 	    &ring->desc[idx]);
 
 	wakeup(&ring->desc[idx]);
+	return;
+
+error:
+	/* If we have an mbuf, we have to free it */
+	if (m != NULL)
+		m_freem(m);
+	return;
 }

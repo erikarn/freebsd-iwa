@@ -9,6 +9,7 @@ extern	int iwa_mvm_send_cmd_status(struct iwa_softc *,
 extern	int iwa_mvm_send_cmd_pdu_status(struct iwa_softc *, uint8_t,
 	    uint16_t, const void *, uint32_t *);
 extern	void iwa_free_resp(struct iwa_softc *sc, struct iwl_host_cmd *hcmd);
-extern	void iwa_cmd_done(struct iwa_softc *sc, struct iwl_rx_packet *pkt);
+extern	void iwa_cmd_done(struct iwa_softc *sc, struct iwl_rx_packet *pkt,
+	    struct mbuf *m);
 
 #endif	/* __IF_IWA_FW_UTIL_H__ */

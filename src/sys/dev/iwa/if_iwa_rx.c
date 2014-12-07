@@ -121,6 +121,7 @@ iwa_notif_intr(struct iwa_softc *sc)
 
 	hw = le16toh(sc->rxq.stat->closed_rb_num) & 0xfff;
 	while (sc->rxq.cur != hw) {
+		int slot_idx = sc->rxq.cur;
 		struct iwa_rx_data *data = &sc->rxq.data[sc->rxq.cur];
 		struct iwl_rx_packet *pkt;
 		struct iwl_cmd_response *cresp;
@@ -328,29 +329,54 @@ iwa_notif_intr(struct iwa_softc *sc)
 			break;
 		}
 
-		/*
-		 * Why test bit 0x80?  The Linux driver:
-		 *
-		 * There is one exception:  uCode sets bit 15 when it
-		 * originates the response/notification, i.e. when the
-		 * response/notification is not a direct response to a
-		 * command sent by the driver.  For example, uCode issues
-		 * REPLY_RX when it sends a received frame to the driver;
-		 * it is not a direct response to any driver command.
-		 *
-		 * Ok, so since when is 7 == 15?  Well, the Linux driver
-		 * uses a slightly different format for pkt->hdr, and "qid"
-		 * is actually the upper byte of a two-byte field.
-		 */
 		device_printf(sc->sc_dev, "%s: checking flags=0x%04x, is_cmd=%d\n",
 		    __func__,
 		    le16toh(pkt->hdr.sequence),
 		    IWA_SEQ_TO_UCODE_RX(le16toh(pkt->hdr.sequence)));
 
+		/*
+		 * Right now this unconditionally gives the response
+		 * to the command layer and replenishes the mbuf.
+		 *
+		 * This is inefficient but cleaner.
+		 *
+		 * Later on we can optimise things by only doing this
+		 * if the command layer decides it wants ownership of
+		 * the mbuf (ie, the requesting command wanted the
+		 * response, and not just to wait for the command to
+		 * complete.)
+		 */
 		if (IWA_SEQ_TO_UCODE_RX(le16toh(pkt->hdr.sequence)) == 0) {
+			struct mbuf *m;
+			int error;
+
 			device_printf(sc->sc_dev,
 			    "%s: command response!\n", __func__);
-			iwa_cmd_done(sc, pkt);
+
+			SYNC_RESP_STRUCT(cresp, pkt);
+			m = data->m;
+			/*
+			 * Attempt to replace the buffer that we're about
+			 * give to the command.
+			 *
+			 * If we can't replenish things, then we pass in
+			 * a NULL mbuf pointer so the caller knows that
+			 * it can't steal the buffer.
+			 */
+			error = iwa_rx_addbuf(sc, &sc->rxq, IWA_RBUF_SIZE,
+			    slot_idx);
+			if (error != 0) {
+				device_printf(sc->sc_dev,
+				    "%s: failed to replenish buffer!\n",
+				    __func__);
+				m = NULL;
+			}
+
+			/*
+			 * Notify the command layer about the buffer
+			 * we're giving to them to free.
+			 */
+			iwa_cmd_done(sc, pkt, m);
 		}
 
 		ADVANCE_RXQ(sc);

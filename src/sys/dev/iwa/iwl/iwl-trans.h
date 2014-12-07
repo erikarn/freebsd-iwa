@@ -272,9 +272,25 @@ enum iwl_hcmd_dataflag {
  */
 struct iwl_host_cmd {
 	const void *data[IWL_MAX_CMD_TBS_PER_TFD];
+
+	/* This points to the rx packet for the response */
 	struct iwl_rx_packet *resp_pkt;
+
+	/*
+	 * These two are linux specific entries for
+	 * the page that's being "given" to the
+	 * sender in order to use and free.
+	 */
 	unsigned long _rx_page_addr;
 	u32 _rx_page_order;
+
+	/*
+	 * This is FreeBSD specific - it's a void
+	 * pointer to the original "thing" that backs
+	 * the resp_pkt.  For FreeBSD it's the mbuf.
+	 */
+	void *resp_obj;
+
 	int handler_status;
 
 	u32 flags;

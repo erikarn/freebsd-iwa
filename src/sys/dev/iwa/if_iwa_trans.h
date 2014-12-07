@@ -73,6 +73,35 @@ struct iwa_tx_ring {
         int                     cur;
 };
 
+/*
+ * This represents the link "back" from the sending
+ * command slot entry to the hcmd that originated
+ * it.
+ *
+ * For async TX commands, the slot entry will be NULL.
+ * For sync TX commands that don't want the response,
+ *   the slot entry will be NULL.
+ * For sync TX commands that want a response, the
+ *  slot entry will be not-NULL.
+ *
+ * // if 0
+ * I'm cheating by using a void pointer here so
+ * I don't have to worry about getting types right.
+ * But it's intended to be a iwl_host_cmd pointer.
+ * // endif
+ *
+ * Note!  This is where things get murky.
+ * This is intended to be protected by the IWA lock.
+ * That way if the caller errors out before the
+ * interrupt routine fires, the caller can remove
+ * the ring slot pointer so the completion path
+ * won't notify the now-stale iwl_host_cmd pointer.
+ */
+
+struct iwa_tx_ring_meta {
+	struct iwl_host_cmd *meta[IWA_TX_RING_COUNT];
+};
+
 #define IWA_RX_RING_COUNT       256
 #define IWA_RBUF_COUNT          (IWA_RX_RING_COUNT + 32)
 /* Linux driver optionally uses 8k buffer */

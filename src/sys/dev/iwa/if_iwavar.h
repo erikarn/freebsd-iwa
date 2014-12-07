@@ -82,6 +82,7 @@ struct iwa_softc {
 
 	/* TX/RX rings. */
 	struct iwa_tx_ring txq[IWA_MVM_MAX_QUEUES];
+	struct iwa_tx_ring_meta txq_meta[IWA_MVM_MAX_QUEUES];
 	struct iwa_rx_ring rxq;
 	int qfullmsk;
 
