@@ -384,7 +384,7 @@ iwa_mvm_send_cmd_status(struct iwa_softc *sc,
 	KASSERT((cmd->flags & CMD_WANT_SKB) == 0, (""));
 	KASSERT((cmd->flags & CMD_ASYNC) == 0, (""));
 
-	/* Async command */
+	/* sync command; want response */
 	cmd->flags |= CMD_WANT_SKB;
 
 	if ((error = iwa_send_cmd(sc, cmd)) != 0)
@@ -440,6 +440,21 @@ iwa_mvm_send_cmd_pdu_status(struct iwa_softc *sc, uint8_t id,
 /*
  * XXX this is some kind of wakeup response thing; it should be
  * done by the received message actually doing a wakeup() as appropriate.
+ *
+ * XXX TODO: this needs to be split up into a TX side only thing;
+ *           which frees any response mbuf associated with a transmit
+ *           command.
+ *
+ * What we really need to do here is:
+ *
+ * + Whenever the command completion occurs, the rx slot mbuf is given
+ *   to the command response, and a new mbuf is put in that RX slot
+ * + .. so if we end up receiving a lot of rx frames whilst doing
+ *   some deferred processing in another thread, things don't get
+ *   trodden over.
+ * + Then once the command is completed, the code sleeping on the
+ *   command can do what it wants with the buffer and then
+ *   free the received mbuf associated with this transmit slot.
  */
 void
 iwa_free_resp(struct iwa_softc *sc, struct iwl_host_cmd *hcmd)
@@ -460,6 +475,13 @@ iwa_free_resp(struct iwa_softc *sc, struct iwl_host_cmd *hcmd)
 /*
  * Process a "command done" firmware notification.  This is where we wakeup
  * processes waiting for a synchronous command completion.
+ *
+ * XXX TODO: we should likely be gifting the RX packet (ie, mbuf) to the
+ * transmit response and replenishing the RX slot with an mbuf.
+ *
+ * _OR_ we should have the caller pre-allocate a buffer that we memcpy()
+ * the command response into, so we don't end up having to replenish
+ * mbufs during interrupt handling.
  *
  * from if_iwn
  */
