@@ -86,6 +86,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/iwa/if_iwavar.h>
 #include <dev/iwa/if_iwareg.h>
 #include <dev/iwa/if_iwa_rx.h>
+#include <dev/iwa/if_iwa_fw_util.h>
 
 #define SYNC_RESP_STRUCT(_var_, _pkt_)					\
 do {									\
@@ -341,12 +342,15 @@ iwa_notif_intr(struct iwa_softc *sc)
 		 * uses a slightly different format for pkt->hdr, and "qid"
 		 * is actually the upper byte of a two-byte field.
 		 */
-		if (IWA_SEQ_TO_UCODE_RX(le16toh(pkt->hdr.sequence) == 0)) {
+		device_printf(sc->sc_dev, "%s: checking flags=0x%04x, is_cmd=%d\n",
+		    __func__,
+		    le16toh(pkt->hdr.sequence),
+		    IWA_SEQ_TO_UCODE_RX(le16toh(pkt->hdr.sequence)));
+
+		if (IWA_SEQ_TO_UCODE_RX(le16toh(pkt->hdr.sequence)) == 0) {
 			device_printf(sc->sc_dev,
 			    "%s: command response!\n", __func__);
-#if 0
 			iwa_cmd_done(sc, pkt);
-#endif
 		}
 
 		ADVANCE_RXQ(sc);
