@@ -111,38 +111,40 @@ iwa_populate_hw_id(struct iwa_softc *sc)
 static int
 iwa_run_init_mvm_ucode(struct iwa_softc *sc, bool justnvm)
 {
-        int error;
+	int error;
 
 	IWA_LOCK_ASSERT(sc);
 
 	device_printf(sc->sc_dev, "%s: started\n", __func__);
 
-        /* do not operate with rfkill switch turned on */
-        if ((sc->sc_flags & IWM_FLAG_RFKILL) && !justnvm) {
-                device_printf(sc->sc_dev, "rfkill active, no go\n");
-                return EPERM;
-        }
+	/* do not operate with rfkill switch turned on */
+	if ((sc->sc_flags & IWM_FLAG_RFKILL) && !justnvm) {
+		device_printf(sc->sc_dev, "rfkill active, no go\n");
+		return (EPERM);
+	}
 
 	/*
 	 * Note: the firmware must be loaded by the caller.
 	 */
 
-        sc->sc_init_complete = false;
-        if ((error = iwa_mvm_load_ucode_wait_alive(sc,
-            IWL_UCODE_INIT)) != 0)
-                return error;
+	sc->sc_init_complete = false;
+	if ((error = iwa_mvm_load_ucode_wait_alive(sc,
+	    IWL_UCODE_INIT)) != 0)
+		return (error);
 
-        if (justnvm) {
+	if (justnvm) {
 		device_printf(sc->sc_dev, "%s: TODO: iwa_nvm_init\n", __func__);
+
 #if 0
-                if ((error = iwa_nvm_init(sc)) != 0) {
-                        device_printf(sc->sc_dev, "failed to read nvm\n");
-                        return error;
-                }
-                device_printf(sc->sc_dev, "MAC address: %s\n",
-                    ether_sprintf(sc->sc_nvm.hw_addr));
-                memcpy(&sc->sc_ic.ic_myaddr,
-                    &sc->sc_nvm.hw_addr, ETHER_ADDR_LEN);
+	if ((error = iwa_nvm_init(sc)) != 0) {
+		device_printf(sc->sc_dev, "failed to read nvm\n");
+		return (error);
+	}
+	device_printf(sc->sc_dev, "MAC address: %s\n",
+	    ether_sprintf(sc->sc_nvm.hw_addr));
+	memcpy(&sc->sc_ic.ic_myaddr,
+	    &sc->sc_nvm.hw_addr,
+	    ETHER_ADDR_LEN);
 
                 sc->sc_scan_cmd_len = sizeof(struct iwl_scan_cmd)
                     + sc->sc_capa_max_probe_len
