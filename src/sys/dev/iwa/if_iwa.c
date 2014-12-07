@@ -511,6 +511,17 @@ iwa_attach(struct iwa_softc *sc)
 	if ((error = iwa_preinit(sc)) != 0) {
 		device_printf(sc->sc_dev, "failed to init firmware: %d\n",
 		    error);
+		/*
+		 * XXX EW:
+		 * Pro-actively disable the interrupt path so detach
+		 * will not get in trouble.
+		 *
+		 * XXX TODO: ideally we'd just refcount all the
+		 * entry points into the driver (ioctl, tx, rx, intr, etc)
+		 * so detach and suspend will actually wait until all
+		 * of the relevant bits have completed/aborted.
+		 */
+		sc->sc_inactive = 1;
 		IWA_UNLOCK(sc);
 		goto fail;
 	}
