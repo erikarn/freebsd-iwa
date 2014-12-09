@@ -135,6 +135,12 @@ iwa_nvm_read_chunk(struct iwa_softc *sc, uint16_t section,
 	int ret, bytes_read, offset_read;
 	uint8_t *resp_data;
 
+	device_printf(sc->sc_dev, "%s: section=%d; offset=%d; length=%d\n",
+	    __func__,
+	    (int) section,
+	    (int) offset,
+	    (int) length);
+
 	cmd.len[0] = sizeof(struct iwl_nvm_access_cmd);
 
 	/* Sync request */
@@ -162,6 +168,11 @@ iwa_nvm_read_chunk(struct iwa_softc *sc, uint16_t section,
 	ret = le16toh(nvm_resp->status);
 	bytes_read = le16toh(nvm_resp->length);
 	offset_read = le16toh(nvm_resp->offset);
+	device_printf(sc->sc_dev, "%s: called; ret=%d, bytes=%d, offset=%d\n",
+	    __func__,
+	    ret,
+	    bytes_read,
+	    offset_read);
 	resp_data = nvm_resp->data;
 	if (ret) {
 		device_printf(sc->sc_dev,
@@ -457,7 +468,8 @@ iwa_nvm_init(struct iwa_softc *sc)
 	IWA_DPRINTF(sc, IWA_DEBUG_NVRAM, "%s: Read NVM\n", __func__);
 
 	/* TODO: find correct NVM max size for a section */
-	nvm_buffer = malloc(OTP_LOW_IMAGE_SIZE, M_TEMP, M_NOWAIT);
+	nvm_buffer = malloc(sc->sc_cfg->base_params->eeprom_size,
+	    M_TEMP, M_NOWAIT);
 	if (nvm_buffer == NULL) {
 		device_printf(sc->sc_dev,
 		    "%s: nvmbuffer malloc failed\n", __func__);
