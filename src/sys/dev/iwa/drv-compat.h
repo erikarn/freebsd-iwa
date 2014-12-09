@@ -28,9 +28,9 @@ typedef uint64_t __le64;
 typedef uint32_t __be32;
 
 #define	le32_to_cpu(x)	le32toh(x)
-#define	le32_to_cpup(x)	le32toh(*x)
+#define	le32_to_cpup(x)	le32toh(*(x))
 
-#define	le16_to_cpup(x)	le16toh(*x)
+#define	le16_to_cpup(x)	le16toh(*(x))
 
 #define	ETH_ALEN	6
 
