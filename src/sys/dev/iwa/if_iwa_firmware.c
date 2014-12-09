@@ -444,6 +444,9 @@ iwa_read_firmware(struct iwa_softc *sc)
 				goto parse_out;
 			}
 			sc->sc_fw_phy_config = le32toh(*(uint32_t *)tlv_data);
+			device_printf(sc->sc_dev, "%s: phy_config=%08x\n",
+			    __func__,
+			    sc->sc_fw_phy_config);
 			break;
 
 		case IWL_UCODE_TLV_API_CHANGES_SET:
