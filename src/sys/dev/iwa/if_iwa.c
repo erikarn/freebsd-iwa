@@ -505,6 +505,11 @@ iwa_attach(struct iwa_softc *sc)
 
 	IWA_LOCK(sc);
 
+	/*
+	 * Mark the hardware as now-active.
+	 */
+	sc->sc_inactive = 0;
+
 	/* Clear pending interrupts. */
 	IWA_REG_WRITE(sc, CSR_INT, 0xffffffff);
 

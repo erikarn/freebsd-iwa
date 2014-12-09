@@ -163,6 +163,9 @@ iwa_pci_attach(device_t dev)
 	sc->sc_debug = 0;
 #endif
 
+	/* Don't allow interrupt processing to happen just yet */
+	sc->sc_inactive = 1;
+
 	IWA_DPRINTF(sc, IWA_DEBUG_TRACE, "->%s: begin\n",__func__);
 
 	sc->subdevice_id = pci_get_subdevice(dev);
@@ -208,7 +211,16 @@ iwa_pci_attach(device_t dev)
 	if (pci_alloc_msi(dev, &i) == 0)
 		rid = 1;
 
+	/* Allocate the lock early; interrupts may fire. Ugh. */
+	IWA_LOCK_INIT(sc);
+
 	/* Allocate interrupt resource */
+	/*
+	 * XXX So this starts it with interrupts enabled for kldload'ing the
+	 * driver and if there are pending interrupts from a previous run of
+	 * said driver, it'll fire an interrupt early.  Like, before
+	 * iwa_attach is called.
+	 */
 	sc->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid, RF_ACTIVE |
 	    (rid != 0 ? 0 : RF_SHAREABLE));
 	if (sc->irq == NULL) {
@@ -256,8 +268,6 @@ iwa_pci_attach(device_t dev)
 		goto bad;
 	}
 
-	IWA_LOCK_INIT(sc);
-
 	if ((error = iwa_attach(sc)) == 0) {
 		IWA_DPRINTF(sc, IWA_DEBUG_TRACE, "->%s: end\n",__func__);
 		return (0);
@@ -282,11 +292,12 @@ iwa_pci_attach(device_t dev)
 	 * ... ideally we'd shut down the interrupt first, far
 	 * before this happens.
 	 */
-	IWA_LOCK_DESTROY(sc);
 
 	bus_dma_tag_destroy(sc->sc_dmat);
 
 bad:
+	IWA_LOCK_DESTROY(sc);
+
 	if (sc->irq) {
 		if (sc->sc_ih)
 			bus_teardown_intr(dev, sc->irq, sc->sc_ih);
