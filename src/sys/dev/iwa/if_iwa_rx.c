@@ -146,8 +146,9 @@ iwa_notif_intr(struct iwa_softc *sc)
 
 		IWA_DPRINTF(sc,
 		    IWA_DEBUG_RX,
-		    "rx packet seq=0x%04x qid=%d idx=%d flags=%x cmd=%x cur=%d hw=%d\n",
+		    "rx packet seq=0x%04x len=%d qid=%d idx=%d flags=%x cmd=%x cur=%d hw=%d\n",
 		    (int) le16toh(pkt->hdr.sequence),
+		    (int) (le32toh(pkt->len_n_flags) & 0x3fff),
 		    qid, idx,
 		    pkt->hdr.flags,
 		    pkt->hdr.cmd,
