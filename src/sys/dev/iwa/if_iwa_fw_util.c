@@ -230,6 +230,12 @@ iwa_send_cmd(struct iwa_softc *sc, struct iwl_host_cmd *hcmd)
 	    ((unsigned long) hcmd->len[0] + hcmd->len[1] + sizeof(cmd->hdr)),
 	    async ? " (async)" : "");
 
+	device_printf(sc->sc_dev, "%s: ", __func__);
+	for (i = 0; i < hcmd->len[0] + hcmd->len[1] + sizeof(cmd->hdr); i++) {
+	    printf("%02x ", ((char *) cmd)[i] & 0xff);
+	}
+	printf("\n");
+
 	if (hcmd->len[0] > sizeof(cmd->payload)) {
 		bus_dmamap_sync(sc->sc_dmat, data->map, BUS_DMASYNC_PREWRITE);
 	} else {
