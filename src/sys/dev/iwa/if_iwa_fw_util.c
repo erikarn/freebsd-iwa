@@ -181,7 +181,7 @@ iwa_send_cmd(struct iwa_softc *sc, struct iwl_host_cmd *hcmd)
 			error = ENOMEM;
 			goto out;
 		}
-		IWA_DPRINTF(sc, IWA_DEBUG_TX, "%s: m=%p\n", __func__, m);
+		IWA_DPRINTF(sc, IWA_DEBUG_TX, "%s: m=%p; m_data=%p\n", __func__, m, mtod(m, void *));
 		m->m_pkthdr.len = m->m_len = m->m_ext.ext_size;
 
 		cmd = mtod(m, struct iwl_device_cmd *);
@@ -478,8 +478,9 @@ iwa_free_resp(struct iwa_softc *sc, struct iwl_host_cmd *hcmd)
 	    hcmd->resp_pkt,
 	    hcmd->resp_obj);
 	if (hcmd->resp_obj) {
-		m_freem((struct mbuf *) hcmd->resp_obj);
-		IWA_DPRINTF(sc, IWA_DEBUG_TX, "%s: free m=%p\n", __func__, hcmd->resp_obj);
+		struct mbuf *m = (struct mbuf *) hcmd->resp_obj;
+		IWA_DPRINTF(sc, IWA_DEBUG_TX, "%s: free m=%p, data=%p\n", __func__, m, mtod(m, void *));
+		m_freem(m);
 	}
 }
 
@@ -534,8 +535,8 @@ iwa_cmd_done(struct iwa_softc *sc, struct iwl_rx_packet *pkt, struct mbuf *m)
 	if (data->m != NULL) {
 		bus_dmamap_sync(sc->sc_dmat, data->map, BUS_DMASYNC_POSTWRITE);
 		bus_dmamap_unload(sc->sc_dmat, data->map);
+		IWA_DPRINTF(sc, IWA_DEBUG_TX, "%s: free m=%p; data=%p\n", __func__, data->m, mtod(data->m, void *));
 		m_freem(data->m);
-		IWA_DPRINTF(sc, IWA_DEBUG_TX, "%s: free m=%p\n", __func__, data->m);
 		data->m = NULL;
 	}
 
@@ -573,8 +574,8 @@ iwa_cmd_done(struct iwa_softc *sc, struct iwl_rx_packet *pkt, struct mbuf *m)
 	} else {
 		/* Nothing to squirrel away; just free */
 		if (m != NULL) {
+			IWA_DPRINTF(sc, IWA_DEBUG_TX, "%s: free m=%p; data=%p\n", __func__, m, mtod(m, void *));
 			m_freem(m);
-			IWA_DPRINTF(sc, IWA_DEBUG_TX, "%s: free m=%p\n", __func__, m);
 		}
 	}
 
@@ -590,8 +591,8 @@ iwa_cmd_done(struct iwa_softc *sc, struct iwl_rx_packet *pkt, struct mbuf *m)
 error:
 	/* If we have an mbuf, we have to free it */
 	if (m != NULL) {
+		IWA_DPRINTF(sc, IWA_DEBUG_TX, "%s: free m=%p; data=%p\n", __func__, m, mtod(m, void *));
 		m_freem(m);
-		IWA_DPRINTF(sc, IWA_DEBUG_TX, "%s: free m=%p\n", __func__, m);
 	}
 	return;
 }
