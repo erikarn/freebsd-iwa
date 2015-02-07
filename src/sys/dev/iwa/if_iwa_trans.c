@@ -556,10 +556,18 @@ fail:	iwa_free_rx_ring(sc, ring);
 	return error;
 }
 
+/*
+ * Shut down RX DMA.
+ *
+ * This does not clear the RX ring state and re-initialise it from scratch;
+ * it just stops DMA.
+ */
 void
 iwa_reset_rx_ring(struct iwa_softc *sc, struct iwa_rx_ring *ring)
 {
 	int ntries;
+
+	IWA_DPRINTF(sc, IWA_DEBUG_TRANS, "%s: called; resetting RX ring\n", __func__);
 
 	if (iwa_grab_nic_access(sc)) {
 		IWA_REG_WRITE(sc, FH_MEM_RCSR_CHNL0_CONFIG_REG, 0);
@@ -575,7 +583,6 @@ iwa_reset_rx_ring(struct iwa_softc *sc, struct iwa_rx_ring *ring)
 		}
 		iwa_release_nic_access(sc);
 	}
-	ring->cur = 0;
 }
 
 void
@@ -1045,6 +1052,8 @@ iwa_stop_device(struct iwa_softc *sc)
 	int chnl, ntries;
 	int qid;
 
+	IWA_DPRINTF(sc, IWA_DEBUG_TRACE, "%s: called\n", __func__);
+
 	/* tell the device to stop sending interrupts */
 	iwa_disable_interrupts(sc);
 
@@ -1111,6 +1120,8 @@ iwa_stop_device(struct iwa_softc *sc)
 	 */
 	iwa_enable_rfkill_int(sc);
 	iwa_check_rfkill(sc);
+
+	IWA_DPRINTF(sc, IWA_DEBUG_TRACE, "%s: done\n", __func__);
 }
 
 /* iwlwifi pcie/trans.c (always main power) */
