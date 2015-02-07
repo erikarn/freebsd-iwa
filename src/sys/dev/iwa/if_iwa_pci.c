@@ -106,6 +106,8 @@ static const struct iwa_ident iwa_ident_table[] = {
 	{IWL_PCI_DEVICE(0x08B2, 0x426A, iwl7260_2n_cfg)},
 	{IWL_PCI_DEVICE(0x08B2, 0x4262, iwl7260_n_cfg)},
 
+	{IWL_PCI_DEVICE(0x08B2, 0xC262, iwl7260_n_cfg)},
+
 	{ 0, 0, 0, 0, NULL }
 };
 
