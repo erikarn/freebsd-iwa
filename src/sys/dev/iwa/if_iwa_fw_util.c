@@ -420,7 +420,7 @@ iwa_mvm_send_cmd_status(struct iwa_softc *sc,
 		    "%s: response len %d != expected %d len\n",
 		    __func__,
 		    resp_len,
-		    sizeof(*resp));
+		    (int) sizeof(*resp));
 		error = EIO;
 		goto out_free_resp;
 	}
