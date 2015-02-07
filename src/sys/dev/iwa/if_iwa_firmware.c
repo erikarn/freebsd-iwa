@@ -74,6 +74,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/iwa/iwl/iwl-fw.h>
 #include <dev/iwa/iwl/iwl-csr.h>
 #include <dev/iwa/iwl/iwl-config.h>
+#include <dev/iwa/iwl/iwl-trans.h>
 
 #include <dev/iwa/if_iwa_debug.h>
 
@@ -87,7 +88,9 @@ __FBSDID("$FreeBSD$");
  * XXX TODO: pull out the firmware bits completely from the
  * softc so this file doesn't require if_athvar.h to load in.
  */
+#include <dev/iwa/iwl/mvm/fw-api.h>
 
+#include <dev/iwa/if_iwa_fw_util.h>
 
 /*
  * Load in the firmware for the NIC.
@@ -632,23 +635,22 @@ iwa_fw_alive(struct iwa_softc *sc, uint32_t sched_base)
 	return iwa_post_alive(sc);
 }
 
-#if 0
-static int
+int
 iwa_send_tx_ant_cfg(struct iwa_softc *sc, uint8_t valid_tx_ant)
 {
-	struct iwa_tx_ant_cfg_cmd tx_ant_cmd = {
+	struct iwl_tx_ant_cfg_cmd tx_ant_cmd = {
 		.valid = htole32(valid_tx_ant),
 	};
 
-	return iwa_mvm_send_cmd_pdu(sc, TX_ANT_CONFIGURATION_CMD, CMD_SYNC,
+	return iwa_mvm_send_cmd_pdu(sc, TX_ANT_CONFIGURATION_CMD, 0,
 	    sizeof(tx_ant_cmd), &tx_ant_cmd);
 }
 
 /* iwlwifi: mvm/fw.c */
-static int
+int
 iwa_send_phy_cfg_cmd(struct iwa_softc *sc)
 {
-	struct iwa_phy_cfg_cmd phy_cfg_cmd;
+	struct iwl_phy_cfg_cmd phy_cfg_cmd;
 	enum iwl_ucode_type ucode_type = sc->sc_uc_current;
 
 	/* Set parameters */
@@ -658,11 +660,11 @@ iwa_send_phy_cfg_cmd(struct iwa_softc *sc)
 	phy_cfg_cmd.calib_control.flow_trigger =
 	    sc->sc_default_calib[ucode_type].flow_trigger;
 
-	DPRINTFN(10, ("Sending Phy CFG command: 0x%x\n", phy_cfg_cmd.phy_cfg));
-	return iwa_mvm_send_cmd_pdu(sc, PHY_CONFIGURATION_CMD, CMD_SYNC,
+	IWA_DPRINTF(sc, IWA_DEBUG_RESET,
+	    "Sending Phy CFG command: 0x%x\n", phy_cfg_cmd.phy_cfg);
+	return iwa_mvm_send_cmd_pdu(sc, PHY_CONFIGURATION_CMD, 0,
 	    sizeof(phy_cfg_cmd), &phy_cfg_cmd);
 }
-#endif
 
 /*
  * Called to load in the firmware and bring the NIC up.

@@ -47,5 +47,6 @@ struct iwa_fw_info {
 extern	int iwa_find_firmware(struct iwa_softc *sc);
 extern	int iwa_mvm_load_ucode_wait_alive(struct iwa_softc *sc,
 	    enum iwl_ucode_type ucode_type);
-
+extern	int iwa_send_tx_ant_cfg(struct iwa_softc *sc, uint8_t valid_tx_ant);
+extern	int iwa_send_phy_cfg_cmd(struct iwa_softc *sc);
 #endif	/* __IF_IWA_FIRMWARE_H__ */

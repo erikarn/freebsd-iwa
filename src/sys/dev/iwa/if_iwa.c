@@ -109,10 +109,16 @@ iwa_populate_hw_id(struct iwa_softc *sc)
 /*
  * follows iwlwifi/fw.c
  */
+
+#define IWM_FW_VALID_TX_ANT(sc) \
+    ((sc->sc_fw_phy_config & FW_PHY_CFG_TX_CHAIN) >> FW_PHY_CFG_TX_CHAIN_POS)
+#define IWM_FW_VALID_RX_ANT(sc) \
+    ((sc->sc_fw_phy_config & FW_PHY_CFG_RX_CHAIN) >> FW_PHY_CFG_RX_CHAIN_POS)
 static int
 iwa_run_init_mvm_ucode(struct iwa_softc *sc, bool justnvm)
 {
-	int error;
+	int error = 0;
+	int i;
 
 	IWA_LOCK_ASSERT(sc);
 
@@ -155,7 +161,6 @@ iwa_run_init_mvm_ucode(struct iwa_softc *sc, bool justnvm)
                 return 0;
         }
 
-#if 0
         /* Send TX valid antennas before triggering calibrations */
         if ((error = iwa_send_tx_ant_cfg(sc, IWM_FW_VALID_TX_ANT(sc))) != 0)
                 return error;
@@ -174,15 +179,22 @@ iwa_run_init_mvm_ucode(struct iwa_softc *sc, bool justnvm)
          * Nothing to do but wait for the init complete notification
          * from the firmware
          */
-        while (!sc->sc_init_complete)
+	for (i = 0; i < 5000; i++) {
+        	if (sc->sc_init_complete)
+			break;
                 if ((error = tsleep(&sc->sc_init_complete,
                     0, "iwminit", 2*hz)) != 0)
                         break;
+	}
+
+	/* XXX log */
+	if (i == 5000)
+		error = EINVAL;
 
         return error;
-#endif
-        return (EINVAL);
 }
+#undef IWM_FW_VALID_TX_ANT
+#undef IWM_FW_VALID_RX_ANT
 
 /*
  * Pre-initialise the hardware.
