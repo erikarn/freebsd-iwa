@@ -1,6 +1,6 @@
 #!/bin/sh
 
-X_KERNDIR="/home/adrian/work/freebsd/head/obj/usr/home/adrian/work/freebsd/head/src/sys/LUCY_11_i386/" ; export X_KERNDIR
+X_KERNDIR="/home/adrian/work/freebsd/head/obj/usr/home/adrian/work/freebsd/head/src/sys/GENERIC/" ; export X_KERNDIR
 X_SRCDIR="/home/adrian/work/freebsd/head/src/" ; export X_SRCDIR
 # MODULES_LIST="iwa iwafw iwm" ; export MODULES_LIST
 MODULES_LIST="iwa iwafw" ; export MODULES_LIST
