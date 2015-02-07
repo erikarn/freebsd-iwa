@@ -463,6 +463,7 @@ iwa_rx_addbuf(struct iwa_softc *sc, struct iwa_rx_ring *ring,
 		goto fail;
 	}
 	m->m_pkthdr.len = m->m_len = m->m_ext.ext_size;
+	IWA_DPRINTF(sc, IWA_DEBUG_RX, "%s: new; m=%p\n", __func__, m);
 
 	error = bus_dmamap_load(ring->data_dmat, ring->data[idx].map,
 	    mtod(m, void *), IWA_RBUF_SIZE, iwa_dma_map_addr,
