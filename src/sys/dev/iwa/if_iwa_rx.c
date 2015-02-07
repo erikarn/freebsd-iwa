@@ -120,6 +120,11 @@ iwa_notif_intr(struct iwa_softc *sc)
 	    BUS_DMASYNC_POSTREAD);
 
 	hw = le16toh(sc->rxq.stat->closed_rb_num) & 0xfff;
+	IWA_DPRINTF(sc, IWA_DEBUG_RX,
+	    "%s: start: rxq.cur=%d, hw=%d\n",
+	    __func__,
+	    sc->rxq.cur,
+	    hw);
 	while (sc->rxq.cur != hw) {
 		int slot_idx = sc->rxq.cur;
 		struct iwa_rx_data *data = &sc->rxq.data[sc->rxq.cur];
@@ -146,13 +151,13 @@ iwa_notif_intr(struct iwa_softc *sc)
 
 		IWA_DPRINTF(sc,
 		    IWA_DEBUG_RX,
-		    "rx packet seq=0x%04x len=%d qid=%d idx=%d flags=%x cmd=%x cur=%d hw=%d\n",
+		    "rx[%d]: seq=0x%04x len=%d qid=%d idx=%d flags=%x cmd=%x hw=%d\n",
+		    sc->rxq.cur,
 		    (int) le16toh(pkt->hdr.sequence),
 		    (int) (le32toh(pkt->len_n_flags) & 0x3fff),
 		    qid, idx,
 		    pkt->hdr.flags,
 		    pkt->hdr.cmd,
-		    sc->rxq.cur,
 		    hw);
 
 		/*
@@ -381,6 +386,9 @@ iwa_notif_intr(struct iwa_softc *sc)
 		}
 
 		ADVANCE_RXQ(sc);
+		IWA_DPRINTF(sc, IWA_DEBUG_RX, "%s: rx now %d\n",
+		    __func__,
+		    sc->rxq.cur);
 	}
 
 	iwa_clear_bit(sc, CSR_GP_CNTRL, CSR_GP_CNTRL_REG_FLAG_MAC_ACCESS_REQ);
@@ -391,5 +399,8 @@ iwa_notif_intr(struct iwa_softc *sc)
 	 * the write by 8??
 	 */
 	hw = (hw == 0) ? IWA_RX_RING_COUNT - 1 : hw - 1;
+	IWA_DPRINTF(sc, IWA_DEBUG_RX, "%s: done; setting hw=%d\n",
+	    __func__,
+	    hw);
 	IWA_REG_WRITE(sc, FH_RSCSR_CHNL0_WPTR, hw & ~7);
 }
