@@ -101,6 +101,11 @@ do {									\
 	_ptr_ = (void *)((_pkt_)+1);					\
 } while (/*CONSTCOND*/0)
 
+#define	UNLOAD_RX_SLOT(_sc, _data) \
+do { \
+	bus_dmamap_unload(sc->sc_dmat, data->map); \
+} while (0)
+
 #define ADVANCE_RXQ(sc) (sc->rxq.cur = (sc->rxq.cur + 1) % IWA_RX_RING_COUNT);
 
 /*
@@ -360,7 +365,14 @@ iwa_notif_intr(struct iwa_softc *sc)
 			    "%s: command response!\n", __func__);
 
 			SYNC_RESP_STRUCT(cresp, pkt);
+
+			/*
+			 *  Unload this particular dmamap; the mbuf is
+			 * being handed off.
+			 */
+			UNLOAD_RX_SLOT(sc, data);
 			m = data->m;
+
 			/*
 			 * Attempt to replace the buffer that we're about
 			 * give to the command.
