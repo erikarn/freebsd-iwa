@@ -834,29 +834,31 @@ int
 iwa_detach(struct iwa_softc *sc)
 {
 	struct ifnet *ifp = sc->sc_ifp;
-	int qid;
-#if 0
 	struct ieee80211com *ic;
+	int qid;
 
-	DPRINTF(sc, IWN_DEBUG_TRACE, "->%s begin\n", __func__);
+	IWA_DPRINTF(sc, IWA_DEBUG_TRACE, "->%s begin\n", __func__);
 
 	if (ifp != NULL) {
 		ic = ifp->if_l2com;
 
+#if 0
 		ieee80211_draintask(ic, &sc->sc_reinit_task);
 		ieee80211_draintask(ic, &sc->sc_radioon_task);
 		ieee80211_draintask(ic, &sc->sc_radiooff_task);
+#endif
 
-		iwn_stop(sc);
+		iwa_stop(ifp, 1);
 
+#if 0
 		taskqueue_drain_all(sc->sc_tq);
 		taskqueue_free(sc->sc_tq);
 
 		callout_drain(&sc->watchdog_to);
 		callout_drain(&sc->calib_to);
+#endif
 		ieee80211_ifdetach(ic);
 	}
-#endif
 
 	IWA_LOCK(sc);
 
