@@ -366,21 +366,11 @@ iwa_init_channel_map(struct iwa_softc *sc, const uint16_t * const nvm_ch_flags)
 	struct ifnet *ifp = sc->sc_ifp;
 	struct ieee80211com *ic = ifp->if_l2com;
 	struct ieee80211_channel *c;
-	bool is_5ghz;
-
-#if 0
-	struct ieee80211com *ic = &sc->sc_ic;
-	struct iwa_nvm_data *data = &sc->sc_nvm;
-	int ch_idx;
-	struct ieee80211_channel *channel;
-	uint16_t ch_flags;
-	bool is_5ghz;
-#endif
-
-	int ch_idx;
 	struct iwa_nvm_data *data = &sc->sc_nvm;
 	uint16_t ch_flags;
 	uint32_t nflags;
+	bool is_5ghz;
+	int ch_idx;
 
 	/* Initial setup - legacy, HT20 */
 	for (ch_idx = 0; ch_idx < nitems(iwa_nvm_channels); ch_idx++) {
@@ -388,7 +378,7 @@ iwa_init_channel_map(struct iwa_softc *sc, const uint16_t * const nvm_ch_flags)
 
 		if (! (ch_flags & NVM_CHANNEL_VALID))
 			continue;
-		if (ch_idx > NUM_2GHZ_CHANNELS && (! data->sku_cap_band_52GHz_enable))
+		if (ch_idx >= NUM_2GHZ_CHANNELS && (! data->sku_cap_band_52GHz_enable))
 			continue;
 
 		device_printf(sc->sc_dev, "%s: [%d]: ch %d, flags 0x%04x ",
@@ -399,7 +389,7 @@ iwa_init_channel_map(struct iwa_softc *sc, const uint16_t * const nvm_ch_flags)
 		iwa_init_print_channel_flags(ch_flags);
 		printf("\n");
 
-		is_5ghz = !! (ch_idx > NUM_2GHZ_CHANNELS);
+		is_5ghz = !! (ch_idx >= NUM_2GHZ_CHANNELS);
 
 		/* Grab net80211 flags */
 		nflags = iwa_eeprom_channel_flags(ch_flags);
@@ -421,9 +411,13 @@ iwa_init_channel_map(struct iwa_softc *sc, const uint16_t * const nvm_ch_flags)
 			/* 2GHz */
 			c->ic_freq = ieee80211_ieee2mhz(iwa_nvm_channels[ch_idx], IEEE80211_CHAN_G);
 			c->ic_flags = IEEE80211_CHAN_B | nflags;
-			c = &ic->ic_channels[ic->ic_nchans++];
-			c[0] = c[-1];
-			c->ic_flags = IEEE80211_CHAN_G | nflags;
+
+			/* Channel 13 - 11b only */
+			if (iwa_nvm_channels[ch_idx] != 13) {
+				c = &ic->ic_channels[ic->ic_nchans++];
+				c[0] = c[-1];
+				c->ic_flags = IEEE80211_CHAN_G | nflags;
+			}
 		}
 
 		/* HT20 - create duplicate channel; set HT20 */
