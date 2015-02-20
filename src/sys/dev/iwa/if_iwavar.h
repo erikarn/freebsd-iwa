@@ -108,6 +108,9 @@ struct iwa_softc {
 
 	/* Calibration */
 	struct iwl_tlv_calib_ctrl sc_default_calib[IWL_UCODE_TYPE_MAX];
+
+	/* EEPROM sections */
+	struct iwa_nvm_section	sc_nvm_sections[NVM_MAX_NUM_SECTIONS + 1];
 };
 
 #define IWA_LOCK_INIT(_sc) \

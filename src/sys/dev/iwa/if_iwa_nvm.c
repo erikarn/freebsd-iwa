@@ -435,6 +435,16 @@ iwa_init_channel_map(struct iwa_softc *sc, const uint16_t * const nvm_ch_flags)
 	/* XXX TODO */
 }
 
+void
+iwa_eeprom_init_channel_map(struct iwa_softc *sc)
+{
+	const uint16_t *sw;
+
+	sw = (const uint16_t *)sc->sc_nvm_sections[NVM_SECTION_TYPE_SW].data;
+
+	iwa_init_channel_map(sc, &sw[NVM_CHANNELS]);
+}
+
 static int
 iwa_parse_nvm_data(struct iwa_softc *sc,
 	const uint16_t *nvm_hw, const uint16_t *nvm_sw,
@@ -479,7 +489,7 @@ iwa_parse_nvm_data(struct iwa_softc *sc,
 	data->hw_addr[4] = hw_addr[5];
 	data->hw_addr[5] = hw_addr[4];
 
-	iwa_init_channel_map(sc, &nvm_sw[NVM_CHANNELS]);
+//	iwa_init_channel_map(sc, &nvm_sw[NVM_CHANNELS]);
 	data->calib_version = 255;   /* TODO:
 					this value will prevent some checks from
 					failing, we need to check if this
@@ -492,11 +502,6 @@ iwa_parse_nvm_data(struct iwa_softc *sc,
 /*
  * END NVM PARSE
  */
-
-struct iwa_nvm_section {
-        uint16_t length;
-        const uint8_t *data;
-};
 
 #define IWM_FW_VALID_TX_ANT(sc) \
     ((sc->sc_fw_phy_config & FW_PHY_CFG_TX_CHAIN) >> FW_PHY_CFG_TX_CHAIN_POS)
@@ -532,8 +537,6 @@ iwa_parse_nvm_sections(struct iwa_softc *sc, struct iwa_nvm_section *sections)
 int
 iwa_nvm_init(struct iwa_softc *sc)
 {
-	/* XXX big stack variable? */
-	struct iwa_nvm_section nvm_sections[NVM_MAX_NUM_SECTIONS + 1];
 	int i, section, error;
 	uint16_t len;
 	uint8_t *nvm_buffer, *temp;
@@ -555,7 +558,7 @@ iwa_nvm_init(struct iwa_softc *sc)
 #define	N(a)	(sizeof(a)/sizeof(a[0]))
 	for (i = 0; i < N(nvm_to_read); i++) {
 		section = nvm_to_read[i];
-		KASSERT(section <= N(nvm_sections), (""));
+		KASSERT(section <= N(sc->sc_nvm_sections), (""));
 
 		error = iwa_nvm_read_section(sc, section, nvm_buffer, &len);
 		if (error)
@@ -570,13 +573,14 @@ iwa_nvm_init(struct iwa_softc *sc)
 			break;
 		}
 		memcpy(temp, nvm_buffer, len);
-		nvm_sections[section].data = temp;
-		nvm_sections[section].length = len;
+		sc->sc_nvm_sections[section].data = temp;
+		sc->sc_nvm_sections[section].length = len;
 	}
 #undef	N
 	free(nvm_buffer, M_TEMP);
 	if (error)
 		return error;
 
-	return iwa_parse_nvm_sections(sc, nvm_sections);
+	/* XXX TODO: make sure we free the sections when we're done */
+	return iwa_parse_nvm_sections(sc, sc->sc_nvm_sections);
 }

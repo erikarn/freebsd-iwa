@@ -72,6 +72,7 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/iwa/iwl/iwl-config.h>
 #include <dev/iwa/iwl/iwl-fw.h>
+#include <dev/iwa/iwl/mvm/fw-api.h>
 
 #include <dev/iwa/if_iwa_debug.h>
 #include <dev/iwa/if_iwa_firmware.h>

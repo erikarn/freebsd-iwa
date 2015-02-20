@@ -3,6 +3,10 @@
 
 struct iwa_softc;
 
+struct iwa_nvm_section {
+	uint16_t length;
+	const uint8_t *data;
+};
 
 struct iwa_nvm_data {
 	int n_hw_addrs;
@@ -33,5 +37,6 @@ struct iwa_nvm_data {
 };
 
 extern	int iwa_nvm_init(struct iwa_softc *sc);
+extern	void iwa_eeprom_init_channel_map(struct iwa_softc *sc);
 
 #endif	/* __IF_IWA_NVM_H__ */

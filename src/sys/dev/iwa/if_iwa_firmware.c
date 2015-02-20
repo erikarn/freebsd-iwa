@@ -75,6 +75,11 @@ __FBSDID("$FreeBSD$");
 #include <dev/iwa/iwl/iwl-csr.h>
 #include <dev/iwa/iwl/iwl-config.h>
 #include <dev/iwa/iwl/iwl-trans.h>
+/*
+ * XXX TODO: pull out the firmware bits completely from the
+ * softc so this file doesn't require if_athvar.h to load in.
+ */
+#include <dev/iwa/iwl/mvm/fw-api.h>
 
 #include <dev/iwa/if_iwa_debug.h>
 
@@ -83,12 +88,6 @@ __FBSDID("$FreeBSD$");
 #include <dev/iwa/if_iwa_nvm.h>
 #include <dev/iwa/if_iwareg.h>
 #include <dev/iwa/if_iwavar.h>
-
-/*
- * XXX TODO: pull out the firmware bits completely from the
- * softc so this file doesn't require if_athvar.h to load in.
- */
-#include <dev/iwa/iwl/mvm/fw-api.h>
 
 #include <dev/iwa/if_iwa_fw_util.h>
 

@@ -76,6 +76,8 @@ __FBSDID("$FreeBSD$");
 #include <dev/iwa/iwl/iwl-csr.h>
 #include <dev/iwa/iwl/iwl-fw.h>
 
+#include <dev/iwa/iwl/mvm/fw-api.h>
+
 #include <dev/iwa/if_iwa_firmware.h>
 #include <dev/iwa/if_iwa_trans.h>
 #include <dev/iwa/if_iwa_nvm.h>
@@ -762,6 +764,9 @@ iwa_attach(struct iwa_softc *sc)
 	IFQ_SET_MAXLEN(&ifp->if_snd, ifqmaxlen);
 	ifp->if_snd.ifq_drv_maxlen = ifqmaxlen;
 	IFQ_SET_READY(&ifp->if_snd);
+
+	/* Bring up channel list before we bring up net80211 */
+	iwa_eeprom_init_channel_map(sc);
 
 	ieee80211_ifattach(ic, sc->sc_nvm.hw_addr);
 	ic->ic_vap_create = iwa_vap_create;
