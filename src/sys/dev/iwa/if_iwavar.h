@@ -29,6 +29,12 @@
 
 struct iwa_vap {
 	struct ieee80211vap	iv_vap;
+	uint8_t			iv_ridx;
+	int			(*iv_newstate)(struct ieee80211vap *,
+				    enum ieee80211_state, int);
+	int			ctx;
+	int			beacon_int;
+	uint8_t			macaddr[IEEE80211_ADDR_LEN];
 };
 #define	IWA_VAP(_vap)	((struct iwa_vap *)(_vap))
 

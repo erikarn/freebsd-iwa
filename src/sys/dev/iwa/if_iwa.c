@@ -462,7 +462,32 @@ iwa_update_mcast(struct ifnet *ifp)
 	return;
 }
 
+static int
+iwa_media_change(struct ifnet *ifp)
+{
+	int error;
+
+	error = ieee80211_media_change(ifp);
+	return (error == ENETRESET ? 0 : error);
+}
+
 /* net80211 layer */
+
+static int
+iwa_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
+{
+	struct iwa_softc *sc = vap->iv_ic->ic_ifp->if_softc;
+	struct iwa_vap *ivp = IWA_VAP(vap);
+
+	IWA_DPRINTF(sc, IWA_DEBUG_STATE, "%s: %s -> %s\n",
+	    __func__,
+	    ieee80211_state_name[vap->iv_state],
+	    ieee80211_state_name[nstate]);
+
+	/* XXX TODO */
+
+	return (ivp->iv_newstate(vap, nstate, arg));
+}
 
 static struct ieee80211vap *
 iwa_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
@@ -470,16 +495,46 @@ iwa_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
     const uint8_t bssid[IEEE80211_ADDR_LEN],
     const uint8_t mac[IEEE80211_ADDR_LEN])
 {
+	struct iwa_vap *ivp;
+	struct ieee80211vap *vap;
+	uint8_t mac1[IEEE80211_ADDR_LEN];
+//	struct iwa_softc *sc = ic->ic_ifp->if_softc;
 
-	printf("%s: called\n", __func__);
-	return (NULL);
+	/* One VAP only for now */
+	if (! TAILQ_EMPTY(&ic->ic_vaps))
+		return (NULL);
+
+	IEEE80211_ADDR_COPY(mac1, mac);
+
+	ivp = (struct iwa_vap *) malloc(sizeof(struct iwa_vap),
+	    M_80211_VAP, M_NOWAIT | M_ZERO);
+	if (ivp == NULL)
+		return (NULL);
+
+	/* Setup vap */
+	vap = &ivp->iv_vap;
+	ieee80211_vap_setup(ic, vap, name, unit, opmode, flags, bssid, mac1);
+	/* XXX ctx */
+	IEEE80211_ADDR_COPY(ivp->macaddr, mac1);
+	vap->iv_bmissthreshold = 10;
+	ivp->iv_newstate = vap->iv_newstate;
+	vap->iv_newstate = iwa_newstate;
+	/* XXX ctx vap */
+
+	ieee80211_ratectl_init(vap);
+	ieee80211_vap_attach(vap, iwa_media_change, ieee80211_media_status);
+	ic->ic_opmode = opmode;
+	return (vap);
 }
 
 static void
 iwa_vap_delete(struct ieee80211vap *vap)
 {
+	struct iwa_vap *ivp = IWA_VAP(vap);
 
-	printf("%s: called\n", __func__);
+	ieee80211_ratectl_deinit(vap);
+	ieee80211_vap_detach(vap);
+	free(ivp, M_80211_VAP);
 }
 
 static int
