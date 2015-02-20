@@ -363,6 +363,11 @@ static void
 iwa_init_channel_map(struct iwa_softc *sc, const uint16_t * const nvm_ch_flags)
 {
 	device_printf(sc->sc_dev, "%s: TODO\n", __func__);
+	struct ifnet *ifp = sc->sc_ifp;
+	struct ieee80211com *ic = ifp->if_l2com;
+	struct ieee80211_channel *c;
+	bool is_5ghz;
+
 #if 0
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct iwa_nvm_data *data = &sc->sc_nvm;
@@ -394,58 +399,40 @@ iwa_init_channel_map(struct iwa_softc *sc, const uint16_t * const nvm_ch_flags)
 		iwa_init_print_channel_flags(ch_flags);
 		printf("\n");
 
+		is_5ghz = !! (ch_idx > NUM_2GHZ_CHANNELS);
+
 		/* Grab net80211 flags */
 		nflags = iwa_eeprom_channel_flags(ch_flags);
 
 		/* Allocate an ieee80211_channel entry */
 
 		/* Setup! */
+		c = &ic->ic_channels[ic->ic_nchans++];
+
+		c->ic_ieee = iwa_nvm_channels[ch_idx];
+		/* XXX maxregpower */
+		/* XXX maxpower */
+		
+		if (is_5ghz) {
+			/* 5GHz */
+			c->ic_freq = ieee80211_ieee2mhz(iwa_nvm_channels[ch_idx], IEEE80211_CHAN_A);
+			c->ic_flags = IEEE80211_CHAN_A | nflags;
+		} else {
+			/* 2GHz */
+			c->ic_freq = ieee80211_ieee2mhz(iwa_nvm_channels[ch_idx], IEEE80211_CHAN_G);
+			c->ic_flags = IEEE80211_CHAN_B | nflags;
+			c = &ic->ic_channels[ic->ic_nchans++];
+			c[0] = c[-1];
+			c->ic_flags = IEEE80211_CHAN_G | nflags;
+		}
+
+		/* HT20 - create duplicate channel; set HT20 */
+		/* XXX TODO */
 
 	}
 
 	/* Next - add HT40 flags as appropriate */
-
-#if 0
-	for (ch_idx = 0; ch_idx < __arraycount(iwm_nvm_channels); ch_idx++) {
-		ch_flags = le16_to_cpup(nvm_ch_flags + ch_idx);
-		int flags, hw_value;
-
-		if (ch_idx >= NUM_2GHZ_CHANNELS &&
-		    !data->sku_cap_band_52GHz_enable)
-			ch_flags &= ~NVM_CHANNEL_VALID;
-
-		if (!(ch_flags & NVM_CHANNEL_VALID)) {
-			device_printf(sc->sc_dev,
-			    "Ch. %d Flags %x [%sGHz] - No traffic\n",
-			    iwm_nvm_channels[ch_idx],
-			    ch_flags,
-			    (ch_idx >= NUM_2GHZ_CHANNELS) ?
-			    "5.2" : "2.4");
-			continue;
-		}
-
-		hw_value = iwm_nvm_channels[ch_idx];
-		channel = &ic->ic_channels[hw_value];
-
-		is_5ghz = ch_idx >= NUM_2GHZ_CHANNELS;
-		if (!is_5ghz) {
-			flags = IEEE80211_CHAN_2GHZ;
-			channel->ic_flags
-			    = IEEE80211_CHAN_CCK
-			    | IEEE80211_CHAN_OFDM
-			    | IEEE80211_CHAN_DYN
-			    | IEEE80211_CHAN_2GHZ;
-		} else {
-			flags = IEEE80211_CHAN_5GHZ;
-			channel->ic_flags =
-			    IEEE80211_CHAN_A;
-		}
-		channel->ic_freq = ieee80211_ieee2mhz(hw_value, flags);
-
-		if (!(ch_flags & NVM_CHANNEL_ACTIVE))
-			channel->ic_flags |= IEEE80211_CHAN_PASSIVE;
-	}
-#endif
+	/* XXX TODO */
 }
 
 static int
