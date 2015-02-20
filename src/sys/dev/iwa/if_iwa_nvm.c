@@ -305,6 +305,60 @@ enum iwl_nvm_channel_flags {
 #define CHECK_AND_PRINT_I(x)	\
 	((ch_flags & NVM_CHANNEL_##x) ? # x " " : "")
 
+static const uint8_t iwa_nvm_channels[] = {
+	/* 2.4GHz */
+	1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
+
+	/* 5GHz */
+	36, 40, 44, 48, 52, 56, 60, 64,
+	100, 104, 108, 112, 116, 120,
+	124, 128, 132, 136, 140, 144,
+
+	149, 153, 157, 161, 165,
+};
+
+#define	NUM_2GHZ_CHANNELS	14
+
+static uint32_t
+iwa_eeprom_channel_flags(uint16_t ch_flags)
+{
+	uint32_t nflags = 0;
+
+	if ((ch_flags & NVM_CHANNEL_ACTIVE) == 0)
+		nflags |= IEEE80211_CHAN_PASSIVE;
+	if ((ch_flags & NVM_CHANNEL_IBSS) == 0)
+		nflags |= IEEE80211_CHAN_NOADHOC;
+	if (ch_flags & NVM_CHANNEL_DFS) {
+		nflags |= IEEE80211_CHAN_DFS;
+		nflags |= IEEE80211_CHAN_NOADHOC;
+	}
+
+	return (nflags);
+}
+
+static void
+iwa_init_print_channel_flags(uint16_t ch_flags)
+{
+	if (ch_flags & NVM_CHANNEL_VALID)
+		printf("(valid)");
+	if (ch_flags & NVM_CHANNEL_IBSS)
+		printf("(ibss)");
+	if (ch_flags & NVM_CHANNEL_ACTIVE)
+		printf("(active)");
+	if (ch_flags & NVM_CHANNEL_RADAR)
+		printf("(radar)");
+	if (ch_flags & NVM_CHANNEL_DFS)
+		printf("(dfs)");
+	if (ch_flags & NVM_CHANNEL_WIDE)
+		printf("(wide)");
+	if (ch_flags & NVM_CHANNEL_40MHZ)
+		printf("(40mhz)");
+	if (ch_flags & NVM_CHANNEL_80MHZ)
+		printf("(80mhz)");
+	if (ch_flags & NVM_CHANNEL_160MHZ)
+		printf("(160mhz)");
+}
+
 static void
 iwa_init_channel_map(struct iwa_softc *sc, const uint16_t * const nvm_ch_flags)
 {
@@ -316,7 +370,42 @@ iwa_init_channel_map(struct iwa_softc *sc, const uint16_t * const nvm_ch_flags)
 	struct ieee80211_channel *channel;
 	uint16_t ch_flags;
 	bool is_5ghz;
+#endif
 
+	int ch_idx;
+	struct iwa_nvm_data *data = &sc->sc_nvm;
+	uint16_t ch_flags;
+	uint32_t nflags;
+
+	/* Initial setup - legacy, HT20 */
+	for (ch_idx = 0; ch_idx < nitems(iwa_nvm_channels); ch_idx++) {
+		ch_flags = le16_to_cpup(nvm_ch_flags + ch_idx);
+
+		if (! (ch_flags & NVM_CHANNEL_VALID))
+			continue;
+		if (ch_idx > NUM_2GHZ_CHANNELS && (! data->sku_cap_band_52GHz_enable))
+			continue;
+
+		device_printf(sc->sc_dev, "%s: [%d]: ch %d, flags 0x%04x ",
+		    __func__,
+		    ch_idx,
+		    iwa_nvm_channels[ch_idx],
+		    ch_flags);
+		iwa_init_print_channel_flags(ch_flags);
+		printf("\n");
+
+		/* Grab net80211 flags */
+		nflags = iwa_eeprom_channel_flags(ch_flags);
+
+		/* Allocate an ieee80211_channel entry */
+
+		/* Setup! */
+
+	}
+
+	/* Next - add HT40 flags as appropriate */
+
+#if 0
 	for (ch_idx = 0; ch_idx < __arraycount(iwm_nvm_channels); ch_idx++) {
 		ch_flags = le16_to_cpup(nvm_ch_flags + ch_idx);
 		int flags, hw_value;
