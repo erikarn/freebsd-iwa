@@ -38,6 +38,17 @@ struct iwa_vap {
 };
 #define	IWA_VAP(_vap)	((struct iwa_vap *)(_vap))
 
+struct iwa_node {
+	struct			ieee80211_node ni;
+	uint16_t		disable_tid;
+	uint8_t			id;
+	struct {
+		uint64_t	bitmap;
+		int		startidx;
+		int		nframes;
+	} agg[IEEE80211_TID_SIZE];
+};
+
 struct iwa_softc {
 	device_t		sc_dev;
 

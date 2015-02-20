@@ -551,8 +551,8 @@ static struct ieee80211_node *
 iwa_node_alloc(struct ieee80211vap *vap, const uint8_t mac[IEEE80211_ADDR_LEN])
 {
 
-	printf("%s: called\n", __func__);
-	return (NULL);
+	/* XXX TODO: net80211 panics if this returns NULL! */
+	return (malloc(sizeof(struct iwa_node), M_80211_NODE, M_NOWAIT | M_ZERO));
 }
 
 static void
