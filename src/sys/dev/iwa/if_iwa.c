@@ -426,9 +426,25 @@ iwa_init(void *arg)
 static int
 iwa_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
+	//struct iwa_softc *sc = ifp->if_softc;
+	struct ieee80211com *ic = ifp->if_l2com;
+	struct ifreq *ifr = (struct ifreq *) data;
+	int error;
 
-	printf("%s: called\n", __func__);
-	return (ENXIO);
+	switch (cmd) {
+	case SIOCGIFADDR:
+		error = ether_ioctl(ifp, cmd, data);
+		break;
+	/* XXX SIOCSIFFLAGS */
+	case SIOCGIFMEDIA:
+		error = ifmedia_ioctl(ifp, ifr, &ic->ic_media, cmd);
+		break;
+	default:
+		printf("%s: called\n", __func__);
+		error = EINVAL;
+		break;
+	}
+	return (error);
 }
 
 static void
