@@ -412,6 +412,135 @@ out:
 	return rv;
 }
 
+/* ifnet layer */
+
+static void
+iwa_init(void *arg)
+{
+
+	printf("%s: called\n", __func__);
+}
+
+static int
+iwa_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
+{
+
+	printf("%s: called\n", __func__);
+	return (ENXIO);
+}
+
+static void
+iwa_start(struct ifnet *ifp)
+{
+
+	printf("%s: called\n", __func__);
+}
+
+static void
+iwa_update_mcast(struct ifnet *ifp)
+{
+
+	printf("%s: called\n", __func__);
+	return;
+}
+
+/* net80211 layer */
+
+static struct ieee80211vap *
+iwa_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
+    enum ieee80211_opmode opmode, int flags,
+    const uint8_t bssid[IEEE80211_ADDR_LEN],
+    const uint8_t mac[IEEE80211_ADDR_LEN])
+{
+
+	printf("%s: called\n", __func__);
+	return (NULL);
+}
+
+static void
+iwa_vap_delete(struct ieee80211vap *vap)
+{
+
+	printf("%s: called\n", __func__);
+}
+
+static int
+iwa_raw_xmit(struct ieee80211_node *ni, struct mbuf *m,
+    const struct ieee80211_bpf_params *params)
+{
+
+	printf("%s: called\n", __func__);
+	m_freem(m);
+	return (ENOBUFS);
+}
+
+static struct ieee80211_node *
+iwa_node_alloc(struct ieee80211vap *vap, const uint8_t mac[IEEE80211_ADDR_LEN])
+{
+
+	printf("%s: called\n", __func__);
+	return (NULL);
+}
+
+static void
+iwa_newassoc(struct ieee80211_node *ni, int isnew)
+{
+
+	printf("%s: called\n", __func__);
+}
+
+static int
+iwa_updateedca(struct ieee80211com *ic)
+{
+
+	printf("%s: called\n", __func__);
+	return (0);
+}
+
+static void
+iwa_scan_start(struct ieee80211com *ic)
+{
+
+	printf("%s: called\n", __func__);
+}
+
+static void
+iwa_scan_end(struct ieee80211com *ic)
+{
+
+	printf("%s: called\n", __func__);
+}
+
+static void
+iwa_set_channel(struct ieee80211com *ic)
+{
+
+	printf("%s: called\n", __func__);
+}
+
+static void
+iwa_scan_curchan(struct ieee80211_scan_state *ss, unsigned long maxdwell)
+{
+
+	printf("%s: called\n", __func__);
+}
+
+static void
+iwa_scan_mindwell(struct ieee80211_scan_state *ss)
+{
+
+	printf("%s: called\n", __func__);
+}
+
+static int
+iwa_setregdomain(struct ieee80211com *ic, struct ieee80211_regdomain *rd,
+    int nchan, struct ieee80211_channel chans[])
+{
+
+	printf("%s: called\n", __func__);
+	return (0);
+}
+
 /*
  * XXX TODO - we can't assume interrupts are available at attach() time,
  * so this whole "load initial firmware at attach time" has to either stop
@@ -423,11 +552,8 @@ out:
 int
 iwa_attach(struct iwa_softc *sc)
 {
-#if 0
 	struct ieee80211com *ic;
 	struct ifnet *ifp;
-	uint8_t macaddr[IEEE80211_ADDR_LEN];
-#endif
 	int error;
 	int i;
 
@@ -545,10 +671,9 @@ iwa_attach(struct iwa_softc *sc)
 
 	IWA_UNLOCK(sc);
 
-#if 0
 	ifp = sc->sc_ifp = if_alloc(IFT_IEEE80211);
 	if (ifp == NULL) {
-		device_printf(dev, "can not allocate ifnet structure\n");
+		device_printf(sc->sc_dev, "can not allocate ifnet structure\n");
 		goto fail;
 	}
 
@@ -573,13 +698,7 @@ iwa_attach(struct iwa_softc *sc)
 		| IEEE80211_C_PMGT		/* Station-side power mgmt */
 		;
 
-	/* Read MAC address, channels, etc from EEPROM. */
-	if ((error = iwn_read_eeprom(sc, macaddr)) != 0) {
-		device_printf(dev, "could not read EEPROM, error %d\n",
-		    error);
-		goto fail;
-	}
-
+#if 0
 	/* Count the number of available chains. */
 	sc->ntxchains =
 	    ((sc->txchainmask >> 2) & 1) +
@@ -632,22 +751,24 @@ iwa_attach(struct iwa_softc *sc)
 #endif
 			;
 	}
+#endif
 
-	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
+	if_initname(ifp, device_get_name(sc->sc_dev), device_get_unit(sc->sc_dev));
 	ifp->if_softc = sc;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
-	ifp->if_init = iwn_init;
-	ifp->if_ioctl = iwn_ioctl;
-	ifp->if_start = iwn_start;
+	ifp->if_init = iwa_init;
+	ifp->if_ioctl = iwa_ioctl;
+	ifp->if_start = iwa_start;
 	IFQ_SET_MAXLEN(&ifp->if_snd, ifqmaxlen);
 	ifp->if_snd.ifq_drv_maxlen = ifqmaxlen;
 	IFQ_SET_READY(&ifp->if_snd);
 
-	ieee80211_ifattach(ic, macaddr);
-	ic->ic_vap_create = iwn_vap_create;
-	ic->ic_vap_delete = iwn_vap_delete;
-	ic->ic_raw_xmit = iwn_raw_xmit;
-	ic->ic_node_alloc = iwn_node_alloc;
+	ieee80211_ifattach(ic, sc->sc_nvm.hw_addr);
+	ic->ic_vap_create = iwa_vap_create;
+	ic->ic_vap_delete = iwa_vap_delete;
+	ic->ic_raw_xmit = iwa_raw_xmit;
+	ic->ic_node_alloc = iwa_node_alloc;
+#if 0
 	sc->sc_ampdu_rx_start = ic->ic_ampdu_rx_start;
 	ic->ic_ampdu_rx_start = iwn_ampdu_rx_start;
 	sc->sc_ampdu_rx_stop = ic->ic_ampdu_rx_stop;
@@ -658,18 +779,22 @@ iwa_attach(struct iwa_softc *sc)
 	ic->ic_addba_response = iwn_addba_response;
 	sc->sc_addba_stop = ic->ic_addba_stop;
 	ic->ic_addba_stop = iwn_ampdu_tx_stop;
-	ic->ic_newassoc = iwn_newassoc;
-	ic->ic_wme.wme_update = iwn_updateedca;
-	ic->ic_update_mcast = iwn_update_mcast;
-	ic->ic_scan_start = iwn_scan_start;
-	ic->ic_scan_end = iwn_scan_end;
-	ic->ic_set_channel = iwn_set_channel;
-	ic->ic_scan_curchan = iwn_scan_curchan;
-	ic->ic_scan_mindwell = iwn_scan_mindwell;
-	ic->ic_setregdomain = iwn_setregdomain;
+#endif
+	ic->ic_newassoc = iwa_newassoc;
+	ic->ic_wme.wme_update = iwa_updateedca;
+	ic->ic_update_mcast = iwa_update_mcast;
+	ic->ic_scan_start = iwa_scan_start;
+	ic->ic_scan_end = iwa_scan_end;
+	ic->ic_set_channel = iwa_set_channel;
+	ic->ic_scan_curchan = iwa_scan_curchan;
+	ic->ic_scan_mindwell = iwa_scan_mindwell;
+	ic->ic_setregdomain = iwa_setregdomain;
 
+#if 0
 	iwn_radiotap_attach(sc);
+#endif
 
+#if 0
 	callout_init_mtx(&sc->calib_to, &sc->sc_mtx, 0);
 	callout_init_mtx(&sc->watchdog_to, &sc->sc_mtx, 0);
 	TASK_INIT(&sc->sc_reinit_task, 0, iwn_hw_reset, sc);
@@ -686,28 +811,10 @@ iwa_attach(struct iwa_softc *sc)
 	}
 
 	iwn_sysctlattach(sc);
-
-	/*
-	 * Hook our interrupt after all initialization is complete.
-	 */
-	error = bus_setup_intr(dev, sc->irq, INTR_TYPE_NET | INTR_MPSAFE,
-	    NULL, iwn_intr, sc, &sc->sc_ih);
-	if (error != 0) {
-		device_printf(dev, "can't establish interrupt, error %d\n",
-		    error);
-		goto fail;
-	}
-
-#if 0
-	device_printf(sc->sc_dev, "%s: rx_stats=%d, rx_stats_bt=%d\n",
-	    __func__,
-	    sizeof(struct iwn_stats),
-	    sizeof(struct iwn_stats_bt));
 #endif
 
 	if (bootverbose)
 		ieee80211_announce(ic);
-#endif
 
 	IWA_DPRINTF(sc, IWA_DEBUG_TRACE, "->%s: end\n",__func__);
 	return 0;
