@@ -153,4 +153,6 @@ const struct iwl_cfg iwl8260_2ac_sdio_cfg = {
 	.disable_dummy_notification = true,
 };
 
-//MODULE_FIRMWARE(IWL8000_MODULE_FIRMWARE(IWL8000_UCODE_API_OK));
+#ifdef __linux__
+MODULE_FIRMWARE(IWL8000_MODULE_FIRMWARE(IWL8000_UCODE_API_OK));
+#endif
