@@ -1,6 +1,3 @@
-#ifndef	__IF_IWAVAR_H__
-#define	__IF_IWAVAR_H__
-
 /*-
  * Copyright (c) 2014 Adrian Chadd <adrian@FreeBSD.org>
  *
@@ -15,12 +12,14 @@
  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *
+ * $FreeBSD$
  */
-/* $FreeBSD$ */
+#ifndef	__IF_IWAVAR_H__
+#define	__IF_IWAVAR_H__
 
 /* maximal number of Tx queues in any platform */
 #define IWA_MVM_MAX_QUEUES      20
-
 
 #define	IWM_FLAG_USE_ICT	0x01
 #define	IWM_FLAG_HW_INITED	0x02
