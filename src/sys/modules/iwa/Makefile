@@ -9,6 +9,8 @@ SRCS    = if_iwa.c if_iwa_firmware.c if_iwa_pci.c \
 
 SRCS+=	device_if.h bus_if.h pci_if.h opt_iwn.h opt_wlan.h
 
+CFLAGS+= -I${.CURDIR}/../../
+
 .PATH:  ${.CURDIR}/../../dev/iwa/iwl/
 SRCS	+= iwl-7000.c iwl-8000.c
 
