@@ -1,6 +1,6 @@
 # $FreeBSD$
 
-KMOD=	iwa_fw_7265_9
+KMOD=	iwlwifi-7265-9
 IMG=	iwlwifi-7265-9
 
 .include <bsd.kmod.mk>
