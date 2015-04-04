@@ -163,10 +163,8 @@ out:
 int
 iwa_find_firmware(struct iwa_softc *sc)
 {
-#if 0
 	int i, error;
 	char fwname[64];
-#endif
 
 	if (sc->sc_cfg == NULL) {
 		device_printf(sc->sc_dev, "%s: called; cfg=NULL; no config?\n",
@@ -174,24 +172,18 @@ iwa_find_firmware(struct iwa_softc *sc)
 		return (EINVAL);
 	}
 
-#if 0
-	/* XXX firmware name is likely not right */
-	for (i = sc->sc_cfg->ucode_api_min; i <= sc->sc_cfg->ucode_api_max; i++) {
-		snprintf(fwname, 32, "%s%d",
-		    sc->sc_cfg->fw_name_pre,
+	for (i = sc->sc_cfg->ucode_api_min; i <= sc->sc_cfg->ucode_api_max;
+	     i++) {
+		snprintf(fwname, 32, "%s%d", sc->sc_cfg->fw_name_pre,
 		    i);
 		device_printf(sc->sc_dev, "%s: trying to load firmware '%s'\n",
-		    __func__,
-		    fwname);
+		    __func__, fwname);
 		error = if_iwa_firmware_load(sc, &sc->sc_fw, fwname);
 		if (error == 0)
 			return (0);
 	}
 
 	return (ENOENT);
-#else
-	return if_iwa_firmware_load(sc, &sc->sc_fw, "iwa_fw_7260_9");
-#endif
 }
 
 /*
